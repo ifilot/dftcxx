@@ -96,6 +96,8 @@ private:
     double exc;         // exchange correlation energy
     double enuc;        // nuclear repulsion energy
     double et;          // total energy
+    double single_electron_energy;
+    double electronic_repulsion;
 
     bool is_first;      // whether this is the first iteration
 

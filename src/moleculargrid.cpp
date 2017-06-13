@@ -70,6 +70,10 @@ void GridPoint::set_density(const MatrixXXd& D) {
                         D * this->basis_func_amp);
 }
 
+void GridPoint::scale_density(double factor) {
+    this->density *= factor;
+}
+
 /*
  *
  * MOLECULAR GRID
@@ -153,6 +157,14 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
     }
 
     return amplitudes;
+}
+
+void MolecularGrid::scale_density(unsigned int nr_elec) {
+    double factor = (double)nr_elec / this->calculate_density();
+
+    for(unsigned int i=0; i<this->grid.size(); i++) {
+        this->grid[i].scale_density(factor);
+    }
 }
 
 /**
@@ -301,7 +313,9 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             }
 
             // set weight from cell function
-            this->grid[g].multiply_weight(w_prod / w_sum);
+            if(w_sum != 0.0) {
+                this->grid[g].multiply_weight(w_prod / w_sum);
+            }
         }
     }
 

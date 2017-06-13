@@ -121,6 +121,8 @@ public:
      */
     void set_density(const MatrixXXd& D);
 
+    void scale_density(double factor);
+
     /*
      * GETTERS
      */
@@ -270,6 +272,8 @@ public:
      * @return matrix (basis functions x grid points)
      */
     MatrixXXd get_amplitudes() const;
+
+    void scale_density(unsigned int nr_elec);
 
 private:
     static constexpr double pi = 3.14159265358979323846;

@@ -88,6 +88,12 @@ void DFT::scf() {
                             % this->molgrid->calculate_density()
                             % this->nelec;
 
+        std::cout << boost::format("        E_XC = %9.7f    E_NUC = %9.7f    E_ONE = %9.7f    E_R = %9.7f\n")
+                            % exc
+                            % enuc
+                            % single_electron_energy
+                            % electronic_repulsion;
+
         difference = std::abs(this->et - old_energy);
         old_energy = this->et;
     }
@@ -255,6 +261,7 @@ void DFT::calculate_transformation_matrix() {
     // Calculate the transformation matrix
     X = MatrixXXd::Zero(size, size);
     Xp = MatrixXXd::Zero(size, size);
+
     this->X = U * D;
     this->Xp = X.transpose();
 }
@@ -272,10 +279,10 @@ void DFT::calculate_transformation_matrix() {
  * @return void
  */
 void DFT::calculate_density_matrix() {
-    static const double alpha = 0.5; // mixing parameter alpha
+    static const double alpha = 0.00; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
-    MatrixXXd F = this->T + this->V + 2.0 * this->J + this->XC;
+    MatrixXXd F = this->H + 2.0 * this->J + this->XC;
 
     MatrixXXd Fp = this->Xp * F * this->X;
 
@@ -303,6 +310,7 @@ void DFT::calculate_density_matrix() {
     }
 
     this->molgrid->set_density(P);
+    this->molgrid->scale_density(this->nelec);
 }
 
 /**
@@ -380,9 +388,9 @@ void DFT::calculate_exchange_correlation_matrix() {
  * @return void
  */
 void DFT::calculate_energy() {
-    double single_electron_energy = 2.0 * (this->P * this->H).trace();
-    double electronic_repulsion = 2.0 * (this->P * this->J).trace();
+    this->single_electron_energy = 2.0 * (this->P * this->H).trace();
+    this->electronic_repulsion = 2.0 * (this->P * this->J).trace();
 
     // sum all terms
-    this->et = single_electron_energy + electronic_repulsion + this->enuc + this->exc;
+    this->et = this->single_electron_energy + this->electronic_repulsion + this->enuc + this->exc;
 }
