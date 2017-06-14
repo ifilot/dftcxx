@@ -3,5 +3,5 @@
 from PyQuante import Molecule
 from PyQuante.dft import dft
 
-he = Molecule('lih', [(3,(0,0,0.403635)), (1,(0,0,-1.210905))], units="Bohr")
-en,orbe,orbs = dft(he, functional="LDA", basis="sto-3g")
+lih = Molecule('LiH', [(1,(0,0,-1.210905)), (3,(0,0,0.403635))], units="Bohr")
+en,orbe,orbs = dft(lih, functional="LDA", basis="sto-3g")

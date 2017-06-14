@@ -88,11 +88,13 @@ void DFT::scf() {
                             % this->molgrid->calculate_density()
                             % this->nelec;
 
-        std::cout << boost::format("        E_XC = %9.7f    E_NUC = %9.7f    E_ONE = %9.7f    E_R = %9.7f\n")
+        std::cout << boost::format("\tE_XC \t= %9.7f\n\tE_NUC \t= %9.7f\n\tE_ONE \t= %9.7f\n\tE_J \t= %9.7f\n")
                             % exc
                             % enuc
                             % single_electron_energy
                             % electronic_repulsion;
+
+        std::cout << "----------------------------------------" << std::endl;
 
         difference = std::abs(this->et - old_energy);
         old_energy = this->et;
@@ -125,19 +127,19 @@ void DFT::construct_matrices() {
     const unsigned int size = this->mol->get_nr_bfs();
 
     // overlap matrix
-    this->S = MatrixXXd(size, size);
+    this->S = MatrixXXd::Zero(size, size);
 
     // kinetic energy matrix
-    this->T = MatrixXXd(size, size);
+    this->T = MatrixXXd::Zero(size, size);
 
     // nuclear attraction matrix
-    this->V = MatrixXXd(size, size);
+    this->V = MatrixXXd::Zero(size, size);
 
     // single-electron matrix
-    this->H = MatrixXXd(size, size);
+    this->H = MatrixXXd::Zero(size, size);
 
     // coulombic repulsion matrix
-    this->J = MatrixXXd(size, size);
+    this->J = MatrixXXd::Zero(size, size);
 
     // exchange-correlation matrix
     this->XC = MatrixXXd::Zero(size, size);
@@ -247,7 +249,7 @@ void DFT::calculate_two_electron_integrals() {
  *
  * @return void
  */
-void DFT::calculate_transformation_matrix() {
+void DFT::calculate_transformation_matrix(bool sort) {
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     Eigen::EigenSolver<MatrixXXd> es(this->S, true);
@@ -257,6 +259,31 @@ void DFT::calculate_transformation_matrix() {
     }
 
     MatrixXXd U = es.eigenvectors().real();
+    VectorXd eigenvalues = VectorXd::Zero(size);
+
+    if(sort) {
+        std::vector<std::pair<double, VectorXd>> e;
+        for(unsigned int i=0; i<size; i++) {
+            if(U(0,i) > 0.0) {
+                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), -U.col(i)));
+            } else{
+                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), U.col(i)));
+            }
+        }
+        std::sort(e.begin(), e.end(), [](auto &left, auto &right) {
+            return left.first < right.first;
+        });
+
+        unsigned int j=0;
+        for(const auto& p : e) {
+            for(unsigned int i=0; i<size; i++) {
+                U(i,j) = p.second(i);
+            }
+            D(j,j) = 1.0 / std::sqrt(p.first);
+            eigenvalues(j) = p.first;
+            j++;
+        }
+    }
 
     // Calculate the transformation matrix
     X = MatrixXXd::Zero(size, size);
@@ -278,17 +305,39 @@ void DFT::calculate_transformation_matrix() {
  *
  * @return void
  */
-void DFT::calculate_density_matrix() {
+void DFT::calculate_density_matrix(bool sort) {
     static const double alpha = 0.25; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     MatrixXXd F = this->H + 2.0 * this->J + this->XC;
 
-    MatrixXXd Fp = this->Xp * F * this->X;
+    MatrixXXd Fp = this->Xp * (F * this->X);
 
     // compute eigenvectors and eigenvalues
     Eigen::EigenSolver<MatrixXXd> es(Fp, true);
     this->Cc = es.eigenvectors().real();
+
+    if(sort) {
+        std::vector<std::pair<double, VectorXd>> e;
+        for(unsigned int i=0; i<size; i++) {
+            if(Cc(0,i) > 0.0) {
+                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), -Cc.col(i)));
+            } else{
+                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), Cc.col(i)));
+            }
+        }
+        std::sort(e.begin(), e.end(), [](auto &left, auto &right) {
+            return left.first < right.first;
+        });
+
+        unsigned int j=0;
+        for(const auto& p : e) {
+            for(unsigned int i=0; i<size; i++) {
+                Cc(i,j) = p.second(i);
+            }
+            j++;
+        }
+    }
 
     // obtain true coefficient matrix using the transformation matrix
     this->C = this->X * this->Cc;
@@ -370,7 +419,7 @@ void DFT::calculate_exchange_correlation_matrix() {
     this->exc = weights.dot(ex + ec);
 
     // calculate gridpoint-wise xc potential
-    VectorXd wva = weights.cwiseProduct(vx + vca);
+    VectorXd wva = weights.cwiseProduct((vx + vca + vcb)/2.0);
 
     for(unsigned int i=0; i<this->cgfs.size(); i++) {
         VectorXd row = amplitudes.row(i);

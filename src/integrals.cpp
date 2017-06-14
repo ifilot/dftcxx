@@ -116,10 +116,10 @@ double Integrator::kinetic(const CGF& cgf1, const CGF& cgf2) {
  */
 double Integrator::kinetic(const GTO& gto1, const GTO& gto2) {
     double term0 = gto2.get_alpha() *
-                   (2 * ( gto2.get_l() + gto2.get_m() + gto2.get_n() ) + 3 ) *
+                   (2.0 * ( gto2.get_l() + gto2.get_m() + gto2.get_n() ) + 3.0 ) *
                    this->overlap(gto1, gto2);
 
-    double term1 = -2 * pow(gto2.get_alpha(), 2.0) * (
+    double term1 = -2.0 * pow(gto2.get_alpha(), 2.0) * (
         this->overlap(gto1.get_alpha(), gto1.get_l(), gto1.get_m(), gto1.get_n(), gto1.get_position(), gto2.get_alpha(), gto2.get_l()+2, gto2.get_m(), gto2.get_n(), gto2.get_position()) +
         this->overlap(gto1.get_alpha(), gto1.get_l(), gto1.get_m(), gto1.get_n(), gto1.get_position(), gto2.get_alpha(), gto2.get_l(), gto2.get_m()+2, gto2.get_n(), gto2.get_position()) +
         this->overlap(gto1.get_alpha(), gto1.get_l(), gto1.get_m(), gto1.get_n(), gto1.get_position(), gto2.get_alpha(), gto2.get_l(), gto2.get_m(), gto2.get_n()+2, gto2.get_position())
@@ -252,7 +252,7 @@ double Integrator::repulsion(const GTO &gto1, const GTO &gto2, const GTO &gto3, 
 double Integrator::overlap(double alpha1, unsigned int l1, unsigned int m1, unsigned int n1, const vec3 &a,
                            double alpha2, unsigned int l2, unsigned int m2, unsigned int n2, const vec3 &b) {
 
-    static const double pi = 3.14159265359;
+    static const double pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286;
 
     double rab2 = (a-b).squaredNorm();
     double gamma = alpha1 + alpha2;

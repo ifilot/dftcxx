@@ -25,6 +25,7 @@
 #include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/format.hpp>
+#include <map>
 
 #include "molecule.h"
 #include "moleculargrid.h"
@@ -147,7 +148,7 @@ private:
      *
      * @return void
      */
-    void calculate_transformation_matrix();
+    void calculate_transformation_matrix(bool sort = true);
 
     /*
      * functions for the SCF routine
@@ -165,7 +166,7 @@ private:
      *
      * @return void
      */
-    void calculate_density_matrix();
+    void calculate_density_matrix(bool sort = true);
 
     /**
      * @fn calculate_electronic_repulsion_matrix

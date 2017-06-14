@@ -296,7 +296,7 @@ private:
      *
      * @return void
      */
-    void create_grid(unsigned int fineness);
+    void create_grid(unsigned int fineness = GRID_MEDIUM);
 
     /*
      * auxiliary functions for the Becke grid

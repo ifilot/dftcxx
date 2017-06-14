@@ -47,13 +47,13 @@ GTO::GTO(double _c,
  * @return const double amplitude
  */
 const double GTO::get_amp(const vec3& r) const {
-    double r2 = (r - position).squaredNorm();
+    double r2 = (r - this->position).squaredNorm();
 
     return this->norm *
-           std::pow(r[0]-position[0], l) *
-           std::pow(r[1]-position[1], m) *
-           std::pow(r[2]-position[2], n) *
-           std::exp(- alpha * r2);
+           std::pow(r[0]-this->position[0], l) *
+           std::pow(r[1]-this->position[1], m) *
+           std::pow(r[2]-this->position[2], n) *
+           std::exp(- this->alpha * r2);
 }
 
 /*
@@ -109,8 +109,8 @@ CGF::CGF(const vec3& _r):
 const double CGF::get_amp(const vec3& r) const {
     double sum = 0.0;
 
-    for(unsigned int i=0; i<this->gtos.size(); i++) {
-        sum += gtos[i].get_coefficient() * gtos[i].get_amp(r);
+    for(const auto& gto : this->gtos) {
+        sum += gto.get_coefficient() * gto.get_amp(r);
     }
 
     return sum;

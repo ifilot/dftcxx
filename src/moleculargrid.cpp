@@ -66,8 +66,7 @@ void GridPoint::set_basis_func_amp(const Molecule* _mol) {
  * @return void
  */
 void GridPoint::set_density(const MatrixXXd& D) {
-    this->density = 2.0 * this->basis_func_amp.dot(
-                        D * this->basis_func_amp);
+    this->density = 2.0 * this->basis_func_amp.dot(D * this->basis_func_amp);
 }
 
 void GridPoint::scale_density(double factor) {
@@ -90,7 +89,7 @@ void GridPoint::scale_density(double factor) {
  */
 MolecularGrid::MolecularGrid(const Molecule* _mol) {
     this->mol = _mol;
-    this->create_grid(GRID_ULTRAFINE);
+    this->create_grid();
 }
 
 /**
@@ -255,10 +254,10 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             double w = f * std::pow(std::sin(f * (double)p), 2.0);
 
             // calculate x point in the interval [-1,1] for Gauss-Chebyshev integration
-            double x = std::cos(f * (double)p);
+            const double x = std::cos(f * (double)p);
 
             // convert x to r so that the interval is converted from [-1,1] to [0, infinity]
-            double r = (x +1.0) / (x - 1.0);
+            const double r = (x +1.0) / (x - 1.0);
 
             // calculate weight function of the Gauss-Chebyshev integration
             w =  w / std::sqrt(1.0 - std::pow(x, 2.0)) *
