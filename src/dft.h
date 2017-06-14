@@ -26,6 +26,7 @@
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/format.hpp>
 #include <map>
+#include <chrono>
 
 #include "molecule.h"
 #include "moleculargrid.h"
@@ -58,7 +59,7 @@ public:
      *
      * @return void
      */
-    void add_molecule(const Molecule* _mol);
+    void add_molecule(const std::shared_ptr<Molecule>& _mol);
 
     /**
      * @fn scf
@@ -71,12 +72,12 @@ public:
 private:
     static constexpr double pi = 3.14159265358979323846;
 
-    const Molecule* mol;        // pointer to molecule class
-    MolecularGrid* molgrid;     // molecular grid
-    Integrator* integrator;     // pointer to integrator class
-    Functional* functional;     // pointer to functional class
+    std::shared_ptr<Molecule> mol;              // pointer to molecule class
+    std::unique_ptr<MolecularGrid> molgrid;     // pointer to molecular grid
+    std::shared_ptr<Integrator> integrator;     // pointer to integrator class
+    std::shared_ptr<Functional> functional;     // pointer to functional class
 
-    std::vector<const CGF*> cgfs;   // vector of Contracted Gaussian Functions
+    const std::vector<CGF>* cgfs;               // pointer vector of Contracted Gaussian Functions
 
     MatrixXXd S;        // overlap matrix
     MatrixXXd T;        // kinetic matrix

@@ -1,15 +1,15 @@
 #/**************************************************************************
- #  CMakeLists.txt  --  This file is part of HFCXX.                      *
+ #  CMakeLists.txt  --  This file is part of DFTCXX.                     *
  #                                                                       *
- #  Copyright (C) 2012, Ivo Filot                                        *
+ #  Copyright (C) 2016, Ivo Filot                                        *
  #                                                                       *
- #  HFCXX is free software:                                              *
+ #  DFTCXX is free software:                                             *
  #  you can redistribute it and/or modify it under the terms of the      *
  #  GNU General Public License as published by the Free Software         *
  #  Foundation, either version 3 of the License, or (at your option)     *
  #  any later version.                                                   *
  #                                                                       *
- #  HFCXX is distributed in the hope that it will be useful,             *
+ #  DFTCXX is distributed in the hope that it will be useful,            *
  #  but WITHOUT ANY WARRANTY; without even the implied warranty          *
  #  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
  #  See the GNU General Public License for more details.                 *
@@ -70,8 +70,12 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${Boost_INCLUDE_DIRS}
                     ${EIGEN_INCLUDE_DIRS})
 
-# make C++14
+# use C++14 and SSE2 vectorization
 add_definitions(-std=c++14)
+add_definitions(-msse2)
+if(OPENMP_FOUND)
+    add_definitions(-DHAS_OPENMP)
+endif()
 
 # Add sources
 file(GLOB SOURCES "*.cpp")

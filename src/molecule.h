@@ -68,6 +68,10 @@ public:
         return this->cgfs[i];
     }
 
+    inline const std::vector<CGF>* get_cgfs() const {
+        return &this->cgfs;
+    }
+
     inline const Atom& get_atom(unsigned int i) const {
         return this->atoms[i];
     }

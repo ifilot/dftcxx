@@ -19,18 +19,11 @@
  *                                                                        *
  **************************************************************************/
 
-#include <Eigen/Eigenvalues>
+#include <chrono>
+#include <boost/format.hpp>
 
 #include "molecule.h"
 #include "dft.h"
-
-/*
- * Calculates the energy of H2 using the Hartree-Fock Self-Consistent Field
- * method. An STO-3G basis set is used in the description of the 1s orbitals
- * of the two H atoms. The H atoms are positioned 1.4 a.u. apart.
- *
- * All calculations are performed in standard units.
- */
 
 int main(int argc, char** argv) {
 
@@ -39,11 +32,17 @@ int main(int argc, char** argv) {
         exit(-1);
     }
 
-    Molecule mol(argv[1]);
+    auto start = std::chrono::system_clock::now(); //toc
+
+    auto mol = std::make_shared<Molecule>(argv[1]);
 
     DFT dft;
-    dft.add_molecule(&mol);
+    dft.add_molecule(mol);
     dft.scf();
+
+    auto end = std::chrono::system_clock::now(); //toc
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << boost::format("Total elapsed time: %f ms\n") % elapsed.count();
 
     return 0;
 }

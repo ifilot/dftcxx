@@ -48,7 +48,7 @@ GridPoint::GridPoint(const vec3& _r):
  *
  * @return void
  */
-void GridPoint::set_basis_func_amp(const Molecule* _mol) {
+void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
     unsigned int size = _mol->get_nr_bfs();
     this->basis_func_amp = VectorXd(size);
 
@@ -69,6 +69,15 @@ void GridPoint::set_density(const MatrixXXd& D) {
     this->density = 2.0 * this->basis_func_amp.dot(D * this->basis_func_amp);
 }
 
+/**
+ * @fn scale_density
+ *
+ * @brief multiplies density at gridpoint with factor
+ *
+ * @param factor multiplication factor
+ *
+ * @return void
+ */
 void GridPoint::scale_density(double factor) {
     this->density *= factor;
 }
@@ -87,7 +96,7 @@ void GridPoint::scale_density(double factor) {
  *
  * @return MolecularGrid instance
  */
-MolecularGrid::MolecularGrid(const Molecule* _mol) {
+MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
     this->create_grid();
 }
@@ -148,6 +157,9 @@ VectorXd MolecularGrid::get_densities() const {
 MatrixXXd MolecularGrid::get_amplitudes() const {
     MatrixXXd amplitudes = MatrixXXd(this->mol->get_nr_bfs(), this->grid.size());
 
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
     for(unsigned int i=0; i<this->grid.size(); i++) {
         const VectorXd bfs = this->grid[i].get_basis_func_amp();
         for(unsigned int j=0; j<this->mol->get_nr_bfs(); j++) {
@@ -158,9 +170,18 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
     return amplitudes;
 }
 
-void MolecularGrid::scale_density(unsigned int nr_elec) {
+/**
+ * @fn renormalize_density
+ * @brief normalize density at gridpoints so that sum equals all electrons
+ *
+ * @return void
+ */
+void MolecularGrid::renormalize_density(unsigned int nr_elec) {
     double factor = (double)nr_elec / this->calculate_density();
 
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
     for(unsigned int i=0; i<this->grid.size(); i++) {
         this->grid[i].scale_density(factor);
     }
@@ -177,6 +198,9 @@ void MolecularGrid::scale_density(unsigned int nr_elec) {
  */
 double MolecularGrid::calculate_density() const {
     double sum = 0.0;
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for reduction ( + : sum)
+    #endif
     for(unsigned int i=0; i<this->grid.size(); i++) {
         sum += this->grid[i].get_weight() * this->grid[i].get_density();
     }
@@ -195,6 +219,9 @@ double MolecularGrid::calculate_density() const {
  * numerical integration is carried out over all the atomic grids. The
  * contribution of the atomic grid to the overall integration over the
  * whole molecule is controlled via a weight factor as defined by Becke.
+ *
+ * Reference: A.D. Becke, J.Chem.Phys. 88, 2547, (1988)
+ * Link: http://dx.doi.org/10.1063/1.454033
  *
  * @return void
  */
@@ -286,42 +313,71 @@ void MolecularGrid::create_grid(unsigned int fineness) {
         unsigned int grid_stop = this->grid.size();
 
         // calculate the Becke weights for the atomic grids
+        #ifdef HAS_OPENMP
+        #pragma omp parallel for
+        #endif
         for(unsigned int g=grid_start; g<grid_stop; g++) {
 
-            double w_sum = 0.0;
-            double w_prod = 1.0;
+            double denom = 0.0;
+            double nom = 1.0;
 
-            // loop over all the other atoms to set the weights
+            // loop over all atoms to get Pn(r)
             for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
-
-                if(i != j) {
-                    const vec3 p2 = this->mol->get_atom(j).get_position();
-
-                    double mu =  ((this->grid[g].get_position() - p1).norm()
-                                - (this->grid[g].get_position() - p2).norm() )/
-                                   (p2-p1).norm();
-
-                    // the procedure below ensures that the weights in the
-                    // Becke grids are normalized (as mentioned in the article)
-                    double w_calc1 = this->cutoff( mu);
-                    double w_calc2 = this->cutoff(-mu);
-
-                    w_prod *= w_calc1;
-                    w_sum  += w_calc1 + w_calc2;
+                double term = this->get_becke_weight_pn(j, this->grid[g].get_position()); // obtain single Pn(r) term
+                denom += term;
+                if(i == j) {
+                    nom = term;
                 }
             }
 
-            // set weight from cell function
-            if(w_sum != 0.0) {
-                this->grid[g].multiply_weight(w_prod / w_sum);
+            // set weight from cell function: wn(r) = Pn(r) / SUM_m Pm(r) (eq. 22)
+            if(denom != 0.0) {
+                this->grid[g].multiply_weight(nom / denom);
             }
         }
     }
 
+    // finally loop over all gridpoints again and
     // correct the weights for the Jacobian r**2
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
     for(unsigned int i=0; i<grid.size(); i++) {
         this->grid[i].multiply_weight((this->grid[i].get_position() - this->grid[i].get_atom_position()).squaredNorm() * 4.0 * pi);
     }
+}
+
+/**
+ * @fn get_becke_weight_pn
+ * @brief calculate Pn(r) (i.e. for a single gridpoint) for atom n (eq. 22 in A.D. Becke J.Chem.Phys. 88, 2547)
+ *
+ * Reference: A.D. Becke, J.Chem.Phys. 88, 2547, (1988)
+ * Link: http://dx.doi.org/10.1063/1.454033
+ *
+ * @param atnr atomic number
+ * @param p0   grid point position
+ *
+ * @return double Becke weight value
+ */
+double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
+    double wprod = 1.0;
+    const vec3 p1 = this->mol->get_atom(atnr).get_position();
+
+    for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
+        if(atnr == j) {
+            continue;
+        }
+
+        const vec3 p2 = this->mol->get_atom(j).get_position();
+
+        double mu =  ((p0 - p1).norm()
+                    - (p0 - p2).norm() )/
+                      (p2-p1).norm();
+
+        wprod *= this->cutoff(mu);
+    }
+
+    return wprod;
 }
 
 /**

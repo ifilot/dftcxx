@@ -44,19 +44,27 @@ DFT::DFT() {
  *
  * @return void
  */
-void DFT::add_molecule(const Molecule* _mol) {
+void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
+    std::cout << "Loading molecule and constructing matrices." << std::endl;
+    auto start = std::chrono::system_clock::now(); //tic
+
     // set molecule
     this->mol = _mol;
     this->nelec = this->mol->get_nr_elec();
 
     // construct molecular grid based on molecule and basis functions
-    this->molgrid = new MolecularGrid(this->mol);
+    this->molgrid = std::make_unique<MolecularGrid>(this->mol);
 
     // copy the contracted gaussian functions to the DFT class
     this->copy_cgfs_from_molecule();
 
     // construct all matrices
     this->construct_matrices();
+
+    auto end = std::chrono::system_clock::now(); //toc
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << boost::format("Total time: %f ms\n") % elapsed.count();
+    std::cout << std::endl;
 }
 
 /**
@@ -77,10 +85,15 @@ void DFT::scf() {
     while(difference > 1e-4 || iteration < 3) {
         iteration++;
 
+        auto start = std::chrono::system_clock::now(); //tic
+
         this->calculate_density_matrix();
         this->calculate_electronic_repulsion_matrix();
         this->calculate_exchange_correlation_matrix();
         this->calculate_energy();
+
+        auto end = std::chrono::system_clock::now(); //toc
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
         std::cout << boost::format("%3i    %9.7f    %4.2f (%3i) \n")
                             % iteration
@@ -88,11 +101,12 @@ void DFT::scf() {
                             % this->molgrid->calculate_density()
                             % this->nelec;
 
-        std::cout << boost::format("\tE_XC \t= %9.7f\n\tE_NUC \t= %9.7f\n\tE_ONE \t= %9.7f\n\tE_J \t= %9.7f\n")
+        std::cout << boost::format("\tE_XC \t= %9.7f\n\tE_NUC \t= %9.7f\n\tE_ONE \t= %9.7f\n\tE_J \t= %9.7f\n\tt \t=%9.7f ms\n")
                             % exc
                             % enuc
                             % single_electron_energy
-                            % electronic_repulsion;
+                            % electronic_repulsion
+                            % (elapsed.count());
 
         std::cout << "----------------------------------------" << std::endl;
 
@@ -112,9 +126,7 @@ void DFT::scf() {
  * @return void
  */
 void DFT::copy_cgfs_from_molecule() {
-    for(unsigned int i=0; i<this->mol->get_nr_bfs(); i++) {
-        this->cgfs.push_back(&this->mol->get_cgf(i));
-    }
+    this->cgfs = this->mol->get_cgfs();
 }
 
 /**
@@ -148,13 +160,13 @@ void DFT::construct_matrices() {
     this->P = MatrixXXd::Zero(size, size);
 
     // calculate values of matrix elements
-    for(unsigned int i=0; i<this->cgfs.size(); i++) {
-        for(unsigned int j=i; j<this->cgfs.size(); j++) {
-            S(i,j) = S(j,i) = this->integrator->overlap(*cgfs[i], *cgfs[j]);
-            T(i,j) = T(j,i) = this->integrator->kinetic(*cgfs[i], *cgfs[j]);
+    for(unsigned int i=0; i<this->cgfs->size(); i++) {
+        for(unsigned int j=i; j<this->cgfs->size(); j++) {
+            S(i,j) = S(j,i) = this->integrator->overlap(cgfs->at(i), cgfs->at(j));
+            T(i,j) = T(j,i) = this->integrator->kinetic(cgfs->at(i), cgfs->at(j));
             double v_sum = 0.0;
             for(unsigned int k=0; k<this->mol->get_nr_atoms(); k++) {
-                 v_sum += this->integrator->nuclear(*cgfs[i], *cgfs[j],
+                 v_sum += this->integrator->nuclear(cgfs->at(i), cgfs->at(j),
                                     this->mol->get_atomic_position(k),
                                     this->mol->get_atomic_charge(k));
             }
@@ -191,6 +203,7 @@ void DFT::construct_matrices() {
  */
 void DFT::calculate_nuclear_repulsion() {
     this->enuc = 0.0;
+
     for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
         for(unsigned int j=i+1; j<this->mol->get_nr_atoms(); j++) {
             this->enuc += this->mol->get_atomic_charge(i) *
@@ -213,6 +226,10 @@ void DFT::calculate_two_electron_integrals() {
     unsigned int nrints = integrator->teindex(size,size,size,size);
     this->ints = VectorXd::Ones(nrints);
     this->ints *= -1.0;
+
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for collapse(2)
+    #endif
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
             unsigned int ij = i*(i+1)/2 + j;
@@ -228,10 +245,10 @@ void DFT::calculate_two_electron_integrals() {
                             continue;
                         }
 
-                        this->ints(idx) = integrator->repulsion(*this->cgfs[i],
-                                                                *this->cgfs[j],
-                                                                *this->cgfs[k],
-                                                                *this->cgfs[l]);
+                        this->ints(idx) = integrator->repulsion(this->cgfs->at(i),
+                                                                this->cgfs->at(j),
+                                                                this->cgfs->at(k),
+                                                                this->cgfs->at(l));
                     }
                 }
             }
@@ -359,7 +376,7 @@ void DFT::calculate_density_matrix(bool sort) {
     }
 
     this->molgrid->set_density(P);
-    this->molgrid->scale_density(this->nelec);
+    this->molgrid->renormalize_density(this->nelec);
 }
 
 /**
@@ -375,6 +392,9 @@ void DFT::calculate_electronic_repulsion_matrix() {
     const unsigned int size = this->mol->get_nr_bfs();
 
     // Populate two-electron repulsion matrix
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for collapse(2)
+    #endif
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
             this->J(i,j) = 0.; /* reset G matrix */
@@ -419,12 +439,15 @@ void DFT::calculate_exchange_correlation_matrix() {
     this->exc = weights.dot(ex + ec);
 
     // calculate gridpoint-wise xc potential
-    VectorXd wva = weights.cwiseProduct((vx + vca + vcb)/2.0);
+    VectorXd wva = weights.cwiseProduct((vx + vca + vcb)/2.0); // <-- this needs to be fixed, not fully correct...
 
-    for(unsigned int i=0; i<this->cgfs.size(); i++) {
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
+    for(unsigned int i=0; i<this->cgfs->size(); i++) {
         VectorXd row = amplitudes.row(i);
         VectorXd wva_i = wva.cwiseProduct(row);
-        for(unsigned int j=i; j<this->cgfs.size(); j++) {
+        for(unsigned int j=i; j<this->cgfs->size(); j++) {
             XC(i,j) = XC(j,i) = wva_i.dot(amplitudes.row(j));
         }
     }

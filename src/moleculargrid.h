@@ -22,6 +22,10 @@
 #ifndef _MOLECULAR_GRID_H
 #define _MOLECULAR_GRID_H
 
+#ifdef HAS_OPENMP
+#include <mutex>
+#endif
+
 #include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
 
@@ -109,7 +113,7 @@ public:
      *
      * @return void
      */
-    void set_basis_func_amp(const Molecule* _mol);
+    void set_basis_func_amp(const std::shared_ptr<Molecule>& _mol);
 
     /**
      * @fn set_density
@@ -121,6 +125,16 @@ public:
      */
     void set_density(const MatrixXXd& D);
 
+
+    /**
+     * @fn scale_density
+     *
+     * @brief multiplies density at gridpoint with factor
+     *
+     * @param factor multiplication factor
+     *
+     * @return void
+     */
     void scale_density(double factor);
 
     /*
@@ -210,7 +224,7 @@ public:
      *
      * @return MolecularGrid instance
      */
-    MolecularGrid(const Molecule* _mol);
+    MolecularGrid(const std::shared_ptr<Molecule>& _mol);
 
     /**
      * @fn calculate_density
@@ -273,12 +287,18 @@ public:
      */
     MatrixXXd get_amplitudes() const;
 
-    void scale_density(unsigned int nr_elec);
+    /**
+     * @fn renormalize_density
+     * @brief normalize density at gridpoints so that sum equals all electrons
+     *
+     * @return void
+     */
+    void renormalize_density(unsigned int nr_elec);
 
 private:
     static constexpr double pi = 3.14159265358979323846;
 
-    const Molecule* mol;            // pointer to molecule this grid refers to
+    std::shared_ptr<Molecule> mol;  // pointer to molecule object
 
     std::vector<GridPoint> grid;    // set of all gridpoints
 
@@ -298,12 +318,43 @@ private:
      */
     void create_grid(unsigned int fineness = GRID_MEDIUM);
 
+    /**
+     * @fn get_becke_weight_pn
+     * @brief calculate Pn(r) (i.e. for a single gridpoint) for atom n (eq. 22 in A.D. Becke J.Chem.Phys. 88, 2547)
+     *
+     * Reference: A.D. Becke, J.Chem.Phys. 88, 2547, (1988)
+     * Link: http://dx.doi.org/10.1063/1.454033
+     *
+     * @param atnr atomic number
+     * @param p0   grid point position
+     *
+     * @return double Becke weight value
+     */
+    double get_becke_weight_pn(unsigned int atnr, const vec3& p0);
+
     /*
      * auxiliary functions for the Becke grid
      */
 
-
+    /**
+     * @fn cutoff
+     * @brief calculates the Becke weight
+     *
+     * @param fineness      mu (elliptical coordinate)
+     *
+     * @return double Becke weight value
+     */
     double cutoff(double mu);
+
+    /**
+     * @fn fk
+     * @brief recursive function to have smooth overlapping atomic grids
+     *
+     * @param k     number of iterations
+     * @param mu    elliptical coordinate
+     *
+     * @return value
+     */
     double fk(unsigned int k, double mu);
 };
 
