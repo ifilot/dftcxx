@@ -333,7 +333,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
  * @return double Becke weight value
  */
 double MolecularGrid::cutoff(double mu) {
-    return 0.5 * (1 - this->fk(3, mu));
+    return 0.5 * (1.0 - this->fk(3.0, mu));
 }
 
 /**

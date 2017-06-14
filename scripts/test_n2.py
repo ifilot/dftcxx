@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 from PyQuante import Molecule
 from PyQuante.dft import dft
