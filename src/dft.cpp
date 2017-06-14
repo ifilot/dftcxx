@@ -74,7 +74,7 @@ void DFT::scf() {
     double difference = 1.0;
     unsigned int iteration = 0;
 
-    while(difference > 1e-4) {
+    while(difference > 1e-4 || iteration < 3) {
         iteration++;
 
         this->calculate_density_matrix();
@@ -279,7 +279,7 @@ void DFT::calculate_transformation_matrix() {
  * @return void
  */
 void DFT::calculate_density_matrix() {
-    static const double alpha = 0.00; // mixing parameter alpha (NOTE: obtain this value from input file...)
+    static const double alpha = 0.25; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     MatrixXXd F = this->H + 2.0 * this->J + this->XC;

@@ -1,0 +1,6 @@
+lithium hydride molecule
+basis/sto3g.dat
+bohr
+2
+Li	0.000000 0.000000 0.403635
+H	0.000000 0.000000 -1.210905
