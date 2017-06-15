@@ -72,7 +72,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
 
 # use C++14 and SSE2 vectorization
 add_definitions(-std=c++14)
-add_definitions(-msse2)
+add_definitions(-march=native)
 if(OPENMP_FOUND)
     add_definitions(-DHAS_OPENMP)
 endif()
