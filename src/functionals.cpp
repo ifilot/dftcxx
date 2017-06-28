@@ -24,36 +24,34 @@
 void Functional::xalpha_x_functional(const VectorXd& densitiesa,
                                      const VectorXd& densitiesb,
                                      VectorXd& ex,
-                                     VectorXd& vx) {
+                                     VectorXd& vxa,
+                                     VectorXd& vxb) {
 
     static const double tol = 1e-10;
     static const double xalpha = 2.0 / 3.0;
     static const double fac = -2.25 * xalpha * std::pow(3.0 / 4.0 / pi, 1.0 / 3.0);
 
-    ex = VectorXd::Zero(densitiesa.size());
-    vx = VectorXd::Zero(densitiesa.size());
+    ex  = VectorXd::Zero(densitiesa.size());
+    vxa = VectorXd::Zero(densitiesa.size());
+    vxb = VectorXd::Zero(densitiesb.size());
 
     for(unsigned int i=0; i<densitiesa.size(); i++) {
         if(densitiesa(i) < tol) {
-            ex(i) += 0.0;
-            vx(i) += 0.0;
             continue;
         } else {
             double rho3 = std::pow(densitiesa(i), 1.0 / 3.0);
             ex(i) += fac * densitiesa(i) * rho3;
-            vx(i) += 4.0 / 3.0 * fac * rho3;
+            vxa(i) += 4.0 / 3.0 * fac * rho3;
         }
     }
 
     for(unsigned int i=0; i<densitiesb.size(); i++) {
         if(densitiesb(i) < tol) {
-            ex(i) += 0.0;
-            vx(i) += 0.0;
             continue;
         } else {
             double rho3 = std::pow(densitiesb(i), 1.0 / 3.0);
             ex(i) += fac * densitiesb(i) * rho3;
-            vx(i) += 4.0 / 3.0 * fac * rho3;
+            vxb(i) += 4.0 / 3.0 * fac * rho3;
         }
     }
 }

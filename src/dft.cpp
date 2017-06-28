@@ -419,18 +419,19 @@ void DFT::calculate_exchange_correlation_matrix() {
     VectorXd  weights     = this->molgrid->get_weights();
     MatrixXXd amplitudes  = this->molgrid->get_amplitudes();
 
-    VectorXd ex;
-    VectorXd vx;
+    VectorXd ex;    // exchange energy
+    VectorXd vxa;    // exchange potential (spin-up)
+    VectorXd vxb;    // exchange potential (spin-down)
 
-    VectorXd ec;
-    VectorXd vca;
-    VectorXd vcb;
+    VectorXd ec;    // correlation energy
+    VectorXd vca;   // correlation potential (spin-up)
+    VectorXd vcb;   // correlation potential (spin-down)
 
-    VectorXd densitiesa = densities / 2.0;
-    VectorXd densitiesb = densities / 2.0;
+    VectorXd densitiesa = densities * 0.5;
+    VectorXd densitiesb = densities * 0.5;
 
     // calculate exchange energies and potential
-    this->functional->xalpha_x_functional(densitiesa, densitiesb, ex, vx);
+    this->functional->xalpha_x_functional(densitiesa, densitiesb, ex, vxa, vxb);
 
     // calculate correlation energy and potential
     this->functional->vwm_c_functional(densitiesa, densitiesb, ec, vca, vcb);
@@ -439,14 +440,13 @@ void DFT::calculate_exchange_correlation_matrix() {
     this->exc = weights.dot(ex + ec);
 
     // calculate gridpoint-wise xc potential
-    VectorXd wva = weights.cwiseProduct((vx + vca + vcb)/2.0); // <-- this needs to be fixed, not fully correct...
+    VectorXd wva = weights.cwiseProduct(vxa + vca); // only return spin-up part for non-spin-polarized
 
     #ifdef HAS_OPENMP
     #pragma omp parallel for
     #endif
     for(unsigned int i=0; i<this->cgfs->size(); i++) {
-        VectorXd row = amplitudes.row(i);
-        VectorXd wva_i = wva.cwiseProduct(row);
+        VectorXd wva_i = wva.cwiseProduct(amplitudes.row(i));
         for(unsigned int j=i; j<this->cgfs->size(); j++) {
             XC(i,j) = XC(j,i) = wva_i.dot(amplitudes.row(j));
         }

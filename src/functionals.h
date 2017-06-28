@@ -36,7 +36,9 @@ public:
     void xalpha_x_functional(const VectorXd& densitiesa,
                              const VectorXd& densitiesb,
                              VectorXd& ex,
-                             VectorXd& vx);
+                             VectorXd& vxa,
+                             VectorXd& vxb);
+
     void vwm_c_functional(const VectorXd& densitiesa,
                           const VectorXd& densitiesb,
                           VectorXd& ec,
