@@ -98,7 +98,7 @@ void GridPoint::scale_density(double factor) {
  */
 MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
-    this->create_grid(GRID_ULTRAFINE);
+    this->create_grid(GRID_MEDIUM);
 }
 
 /**
@@ -362,6 +362,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
     double wprod = 1.0;
     const vec3 p1 = this->mol->get_atom(atnr).get_position();
+    unsigned int at1 = this->mol->get_atom(atnr).get_charge();
 
     for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
         if(atnr == j) {
@@ -374,10 +375,35 @@ double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
                     - (p0 - p2).norm() )/
                       (p2-p1).norm();
 
+        // correct mu for hetero-atoms
+        unsigned int at2 = this->mol->get_atom(j).get_charge();
+
+        if(at1 != at2) {
+            mu += this->get_becke_mu_correction_hetero_atoms(at1, at2, mu);
+        }
+
         wprod *= this->cutoff(mu);
     }
 
     return wprod;
+}
+
+/**
+ * @brief      Gets a correction factor for the Becke mu
+ *
+ * @param[in]  at1   atomic number of atom 1
+ * @param[in]  at2   atomic number of atom 2
+ *
+ * @return     mu correction factor
+ */
+double MolecularGrid::get_becke_mu_correction_hetero_atoms(unsigned int at1, unsigned int at2, double mu) {
+    double chi = bragg_radii[at1-1]/bragg_radii[at2-1];
+    double u = (chi - 1.) / (chi + 1.);
+    double a = u / (u * u - 1);
+    a = std::min(a, 0.5);
+    a = std::max(a, -0.5);
+
+    return a * (1.0 - mu * mu);
 }
 
 /**

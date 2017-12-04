@@ -70,8 +70,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${Boost_INCLUDE_DIRS}
                     ${EIGEN_INCLUDE_DIRS})
 
-# use C++17 and SSE2 vectorization
-add_definitions(-std=c++17)
+# use C++14 and SSE2 vectorization
+add_definitions(-std=c++14)
 add_definitions(-march=native)
 if(OPENMP_FOUND)
     add_definitions(-DHAS_OPENMP)
