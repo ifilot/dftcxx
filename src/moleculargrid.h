@@ -32,6 +32,8 @@
 #include "molecule.h"
 #include "quadrature.h"
 
+#include "bragg.h"
+
 typedef Eigen::Vector3d vec3;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
@@ -331,6 +333,17 @@ private:
      * @return double Becke weight value
      */
     double get_becke_weight_pn(unsigned int atnr, const vec3& p0);
+
+    /**
+     * @brief      Gets a correction factor for the Becke mu
+     *
+     * @param[in]  at1   atomic number of atom 1
+     * @param[in]  at2   atomic number of atom 2
+     * @param[in]  mu    Becke weight value
+     *
+     * @return     mu correction factor
+     */
+    double get_becke_mu_correction_hetero_atoms(unsigned int at1, unsigned int at2, double mu);
 
     /*
      * auxiliary functions for the Becke grid

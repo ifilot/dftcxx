@@ -66,7 +66,7 @@ void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
  * @return void
  */
 void GridPoint::set_density(const MatrixXXd& D) {
-    this->density = 2.0 * this->basis_func_amp.dot(D * this->basis_func_amp);
+    this->density = this->basis_func_amp.dot(D * this->basis_func_amp);
 }
 
 /**
@@ -98,7 +98,7 @@ void GridPoint::scale_density(double factor) {
  */
 MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
-    this->create_grid(GRID_ULTRAFINE);
+    this->create_grid(GRID_MEDIUM);
 }
 
 /**
@@ -284,7 +284,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             const double x = std::cos(f * (double)p);
 
             // convert x to r so that the interval is converted from [-1,1] to [0, infinity]
-            const double r = (x +1.0) / (x - 1.0);
+            const double r = (1.0 + x) / (1.0 - x);
 
             // calculate weight function of the Gauss-Chebyshev integration
             w =  w / std::sqrt(1.0 - std::pow(x, 2.0)) *
@@ -314,7 +314,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 
         // calculate the Becke weights for the atomic grids
         #ifdef HAS_OPENMP
-        #pragma omp parallel for
+        #pragma omp parallel for schedule(dynamic)
         #endif
         for(unsigned int g=grid_start; g<grid_stop; g++) {
 
@@ -362,6 +362,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
     double wprod = 1.0;
     const vec3 p1 = this->mol->get_atom(atnr).get_position();
+    unsigned int at1 = this->mol->get_atom(atnr).get_charge();
 
     for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
         if(atnr == j) {
@@ -374,10 +375,35 @@ double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
                     - (p0 - p2).norm() )/
                       (p2-p1).norm();
 
+        // correct mu for hetero-atoms
+        unsigned int at2 = this->mol->get_atom(j).get_charge();
+
+        if(at1 != at2) {
+            mu += this->get_becke_mu_correction_hetero_atoms(at1, at2, mu);
+        }
+
         wprod *= this->cutoff(mu);
     }
 
     return wprod;
+}
+
+/**
+ * @brief      Gets a correction factor for the Becke mu
+ *
+ * @param[in]  at1   atomic number of atom 1
+ * @param[in]  at2   atomic number of atom 2
+ *
+ * @return     mu correction factor
+ */
+double MolecularGrid::get_becke_mu_correction_hetero_atoms(unsigned int at1, unsigned int at2, double mu) {
+    double chi = bragg_radii[at1-1]/bragg_radii[at2-1];
+    double u = (chi - 1.) / (chi + 1.);
+    double a = u / (u * u - 1);
+    a = std::min(a, 0.5);
+    a = std::max(a, -0.5);
+
+    return a * (1.0 - mu * mu);
 }
 
 /**
