@@ -284,7 +284,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             const double x = std::cos(f * (double)p);
 
             // convert x to r so that the interval is converted from [-1,1] to [0, infinity]
-            const double r = (x +1.0) / (x - 1.0);
+            const double r = (1.0 + x) / (1.0 - x);
 
             // calculate weight function of the Gauss-Chebyshev integration
             w =  w / std::sqrt(1.0 - std::pow(x, 2.0)) *
@@ -314,7 +314,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 
         // calculate the Becke weights for the atomic grids
         #ifdef HAS_OPENMP
-        #pragma omp parallel for
+        #pragma omp parallel for schedule(dynamic)
         #endif
         for(unsigned int g=grid_start; g<grid_stop; g++) {
 

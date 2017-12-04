@@ -97,7 +97,7 @@ void DFT::scf() {
 
         std::cout << boost::format("%3i    %9.7f    %4.2f (%3i) \n")
                             % iteration
-                            % et
+                            % this->et
                             % this->molgrid->calculate_density()
                             % this->nelec;
 
@@ -160,6 +160,9 @@ void DFT::construct_matrices() {
     this->P = MatrixXXd::Zero(size, size);
 
     // calculate values of matrix elements
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for schedule(dynamic)
+    #endif
     for(unsigned int i=0; i<this->cgfs->size(); i++) {
         for(unsigned int j=i; j<this->cgfs->size(); j++) {
             S(i,j) = S(j,i) = this->integrator->overlap(cgfs->at(i), cgfs->at(j));
@@ -228,7 +231,7 @@ void DFT::calculate_two_electron_integrals() {
     this->ints *= -1.0;
 
     #ifdef HAS_OPENMP
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for schedule(dynamic)
     #endif
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
@@ -354,12 +357,16 @@ void DFT::calculate_electronic_repulsion_matrix() {
             for(unsigned int k=0; k<size; k++) {
                 for(unsigned int l=0; l<size; l++) {
                     const unsigned int index = integrator->teindex(i,j,k,l);
-                    
+
                     // Exchange in Hartree-Fock
                     //const unsigned int index2 = integrator->teindex(i,k,l,j);
                     //this->J(i,j) += P(k,l) * (ints(index) - 0.5 * ints(index2));
-                    
-                    this->J(i,j) += P(k,l) * ints(index);
+
+                    // I still don't understand why I need to put a 0.5 here... (see also the function below)
+                    // Does it have anything to do how I construct the density matrix P?
+                    // Can someone who knows the answer send me an e-mail?
+
+                    this->J(i,j) += 0.5 * P(k,l) * ints(index);
                 }
             }
         }
@@ -378,8 +385,8 @@ void DFT::calculate_exchange_correlation_matrix() {
     MatrixXXd amplitudes  = this->molgrid->get_amplitudes();
 
     VectorXd ex;    // exchange energy
-    VectorXd vxa;    // exchange potential (spin-up)
-    VectorXd vxb;    // exchange potential (spin-down)
+    VectorXd vxa;   // exchange potential (spin-up)
+    VectorXd vxb;   // exchange potential (spin-down)
 
     VectorXd ec;    // correlation energy
     VectorXd vca;   // correlation potential (spin-up)
@@ -398,15 +405,17 @@ void DFT::calculate_exchange_correlation_matrix() {
     this->exc = weights.dot(ex + ec);
 
     // calculate gridpoint-wise xc potential
-    VectorXd wva = weights.cwiseProduct(vxa + vxb + vca + vcb);
 
-    #ifdef HAS_OPENMP
-    #pragma omp parallel for
-    #endif
+    // I still don't understand why I need to put a 0.5 here... (see also the function above)
+    // Does it have anything to do how I construct the density matrix P?
+    // Can someone who knows the answer send me an e-mail?
+    VectorXd wva = weights.cwiseProduct((vxa + vxb + vca + vcb) * 0.5);
+
     for(unsigned int i=0; i<this->cgfs->size(); i++) {
-        VectorXd wva_i = wva.cwiseProduct(amplitudes.row(i));
+        VectorXd row = amplitudes.row(i);
+        VectorXd wva_i = wva.cwiseProduct(row);
         for(unsigned int j=i; j<this->cgfs->size(); j++) {
-            XC(i,j) = XC(j,i) = wva_i.dot(amplitudes.row(j));
+            this->XC(i,j) = this->XC(j,i) = wva_i.dot(amplitudes.row(j));
         }
     }
 }

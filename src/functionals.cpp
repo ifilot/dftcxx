@@ -35,6 +35,9 @@ void Functional::xalpha_x_functional(const VectorXd& densitiesa,
     vxa = VectorXd::Zero(densitiesa.size());
     vxb = VectorXd::Zero(densitiesb.size());
 
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
     for(unsigned int i=0; i<densitiesa.size(); i++) {
         if(densitiesa(i) < tol) {
             continue;
@@ -45,6 +48,9 @@ void Functional::xalpha_x_functional(const VectorXd& densitiesa,
         }
     }
 
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
     for(unsigned int i=0; i<densitiesb.size(); i++) {
         if(densitiesb(i) < tol) {
             continue;
@@ -66,8 +72,11 @@ void Functional::vwm_c_functional(const VectorXd& densitiesa,
 
     ec.resize(densitiesa.size());
     vca.resize(densitiesa.size());
-    vcb.resize(densitiesa.size());
+    vcb.resize(densitiesb.size());
 
+    #ifdef HAS_OPENMP
+    #pragma omp parallel for
+    #endif
     for(unsigned int i=0; i<densitiesa.size(); i++) {
         double dens = densitiesa(i) + densitiesb(i);
         if(dens < tol) {
