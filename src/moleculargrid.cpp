@@ -66,7 +66,7 @@ void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
  * @return void
  */
 void GridPoint::set_density(const MatrixXXd& D) {
-    this->density = 2.0 * this->basis_func_amp.dot(D * this->basis_func_amp);
+    this->density = this->basis_func_amp.dot(D * this->basis_func_amp);
 }
 
 /**

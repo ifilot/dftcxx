@@ -102,10 +102,10 @@ void DFT::scf() {
                             % this->nelec;
 
         std::cout << boost::format("\tE_XC \t= %9.7f\n\tE_NUC \t= %9.7f\n\tE_ONE \t= %9.7f\n\tE_J \t= %9.7f\n\tt \t=%9.7f ms\n")
-                            % exc
-                            % enuc
-                            % single_electron_energy
-                            % electronic_repulsion
+                            % this->exc
+                            % this->enuc
+                            % this->single_electron_energy
+                            % this->electronic_repulsion
                             % (elapsed.count());
 
         std::cout << "----------------------------------------" << std::endl;
@@ -269,38 +269,12 @@ void DFT::calculate_two_electron_integrals() {
 void DFT::calculate_transformation_matrix(bool sort) {
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
-    Eigen::EigenSolver<MatrixXXd> es(this->S, true);
-    MatrixXXd D = MatrixXXd::Zero(size, size);
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(S);
+    Eigen::MatrixXd D = es.eigenvalues().real().asDiagonal();
     for(unsigned int i=0; i<size; i++) {
-        D(i,i) = 1.0 / std::sqrt(es.eigenvalues()(i, 0).real() );
+        D(i,i) = 1.0 / std::sqrt(D(i,i));
     }
-
-    MatrixXXd U = es.eigenvectors().real();
-    VectorXd eigenvalues = VectorXd::Zero(size);
-
-    if(sort) {
-        std::vector<std::pair<double, VectorXd>> e;
-        for(unsigned int i=0; i<size; i++) {
-            if(U(0,i) > 0.0) {
-                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), -U.col(i)));
-            } else{
-                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), U.col(i)));
-            }
-        }
-        std::sort(e.begin(), e.end(), [](auto &left, auto &right) {
-            return left.first < right.first;
-        });
-
-        unsigned int j=0;
-        for(const auto& p : e) {
-            for(unsigned int i=0; i<size; i++) {
-                U(i,j) = p.second(i);
-            }
-            D(j,j) = 1.0 / std::sqrt(p.first);
-            eigenvalues(j) = p.first;
-            j++;
-        }
-    }
+    Eigen::MatrixXd U = es.eigenvectors().real();
 
     // Calculate the transformation matrix
     X = MatrixXXd::Zero(size, size);
@@ -323,38 +297,17 @@ void DFT::calculate_transformation_matrix(bool sort) {
  * @return void
  */
 void DFT::calculate_density_matrix(bool sort) {
-    static const double alpha = 0.25; // mixing parameter alpha (NOTE: obtain this value from input file...)
+    static const double alpha = 0.50; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
-    MatrixXXd F = this->H + 2.0 * this->J + this->XC;
+    MatrixXXd F = this->H + this->J + this->XC;
 
-    MatrixXXd Fp = this->Xp * (F * this->X);
+    MatrixXXd Fp = this->Xp * F * this->X;
 
     // compute eigenvectors and eigenvalues
-    Eigen::EigenSolver<MatrixXXd> es(Fp, true);
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(Fp);
+    // Eigen::MatrixXd D = es.eigenvalues().real().asDiagonal();
     this->Cc = es.eigenvectors().real();
-
-    if(sort) {
-        std::vector<std::pair<double, VectorXd>> e;
-        for(unsigned int i=0; i<size; i++) {
-            if(Cc(0,i) > 0.0) {
-                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), -Cc.col(i)));
-            } else{
-                e.push_back(std::make_pair<double, VectorXd>(es.eigenvalues()(i,0).real(), Cc.col(i)));
-            }
-        }
-        std::sort(e.begin(), e.end(), [](auto &left, auto &right) {
-            return left.first < right.first;
-        });
-
-        unsigned int j=0;
-        for(const auto& p : e) {
-            for(unsigned int i=0; i<size; i++) {
-                Cc(i,j) = p.second(i);
-            }
-            j++;
-        }
-    }
 
     // obtain true coefficient matrix using the transformation matrix
     this->C = this->X * this->Cc;
@@ -363,7 +316,7 @@ void DFT::calculate_density_matrix(bool sort) {
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
             for(unsigned int k=0; k < this->nelec / 2; k++) {
-                Pnew(i,j) += C(i,k) * C(j,k);
+                Pnew(i,j) += 2.0 * C(i,k) * C(j,k);
             }
         }
     }
@@ -397,10 +350,15 @@ void DFT::calculate_electronic_repulsion_matrix() {
     #endif
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
-            this->J(i,j) = 0.; /* reset G matrix */
+            this->J(i,j) = 0.; /* reset J matrix */
             for(unsigned int k=0; k<size; k++) {
                 for(unsigned int l=0; l<size; l++) {
-                    unsigned int index = integrator->teindex(i,j,k,l);
+                    const unsigned int index = integrator->teindex(i,j,k,l);
+                    
+                    // Exchange in Hartree-Fock
+                    //const unsigned int index2 = integrator->teindex(i,k,l,j);
+                    //this->J(i,j) += P(k,l) * (ints(index) - 0.5 * ints(index2));
+                    
                     this->J(i,j) += P(k,l) * ints(index);
                 }
             }
@@ -440,7 +398,7 @@ void DFT::calculate_exchange_correlation_matrix() {
     this->exc = weights.dot(ex + ec);
 
     // calculate gridpoint-wise xc potential
-    VectorXd wva = weights.cwiseProduct(vxa + vca); // only return spin-up part for non-spin-polarized
+    VectorXd wva = weights.cwiseProduct(vxa + vxb + vca + vcb);
 
     #ifdef HAS_OPENMP
     #pragma omp parallel for
@@ -460,8 +418,8 @@ void DFT::calculate_exchange_correlation_matrix() {
  * @return void
  */
 void DFT::calculate_energy() {
-    this->single_electron_energy = 2.0 * (this->P * this->H).trace();
-    this->electronic_repulsion = 2.0 * (this->P * this->J).trace();
+    this->single_electron_energy = (this->P * this->H).trace();
+    this->electronic_repulsion = (this->P * this->J).trace();
 
     // sum all terms
     this->et = this->single_electron_energy + this->electronic_repulsion + this->enuc + this->exc;
