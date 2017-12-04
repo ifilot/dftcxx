@@ -48,8 +48,8 @@ endif()
 
 # set Boost
 if(APPLE)
-    SET(BOOST_INCLUDEDIR "/opt/local/include")
-    SET(BOOST_LIBRARYDIR "/opt/local/lib")
+    SET(BOOST_INCLUDEDIR "/usr/local/include")
+    SET(BOOST_LIBRARYDIR "/usr/local/lib")
 ELSE()
     SET(BOOST_INCLUDEDIR "/usr/include")
     SET(BOOST_LIBRARYDIR "/usr/lib/x86_64-linux-gnu")
