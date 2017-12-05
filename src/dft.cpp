@@ -303,7 +303,7 @@ void DFT::calculate_density_matrix(bool sort) {
     static const double alpha = 0.50; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
-    MatrixXXd F = this->H + this->J + this->XC;
+    MatrixXXd F = this->H + 2.0 * this->J + this->XC;
 
     MatrixXXd Fp = this->Xp * F * this->X;
 

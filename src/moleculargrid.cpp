@@ -98,7 +98,7 @@ void GridPoint::scale_density(double factor) {
  */
 MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
-    this->create_grid(GRID_MEDIUM);
+    this->create_grid(GRID_ULTRAFINE);
 }
 
 /**
