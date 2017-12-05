@@ -322,7 +322,7 @@ void DFT::calculate_density_matrix(bool sort) {
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
             for(unsigned int k=0; k < this->nelec / 2; k++) {
-                Pnew(i,j) += 2.0 * C(i,k) * C(j,k);
+                Pnew(i,j) += C(i,k) * C(j,k);
             }
         }
     }
@@ -335,7 +335,7 @@ void DFT::calculate_density_matrix(bool sort) {
     }
 
     this->molgrid->set_density(P);
-    this->molgrid->renormalize_density(this->nelec);
+    //this->molgrid->renormalize_density(this->nelec);
 }
 
 /**
@@ -369,7 +369,7 @@ void DFT::calculate_electronic_repulsion_matrix() {
                     // Does it have anything to do how I construct the density matrix P?
                     // Can someone who knows the answer send me an e-mail?
 
-                    this->J(i,j) += 0.5 * P(k,l) * ints(index);
+                    this->J(i,j) += P(k,l) * ints(index);
                 }
             }
         }
@@ -430,8 +430,8 @@ void DFT::calculate_exchange_correlation_matrix() {
  * @return void
  */
 void DFT::calculate_energy() {
-    this->single_electron_energy = (this->P * this->H).trace();
-    this->electronic_repulsion = (this->P * this->J).trace();
+    this->single_electron_energy = 2.0 * (this->P * this->H).trace();
+    this->electronic_repulsion = 2.0 * (this->P * this->J).trace();
 
     // sum all terms
     this->et = this->single_electron_energy + this->electronic_repulsion + this->enuc + this->exc;

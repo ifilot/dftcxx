@@ -1,23 +1,23 @@
-/**************************************************************************
- *   moleculargrid.cpp  --  This file is part of DFTCXX.                  *
- *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
- *                                                                        *
- *   DFTCXX is free software:                                             *
- *   you can redistribute it and/or modify it under the terms of the      *
- *   GNU General Public License as published by the Free Software         *
- *   Foundation, either version 3 of the License, or (at your option)     *
- *   any later version.                                                   *
- *                                                                        *
- *   DFTCXX is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
- *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
- *   See the GNU General Public License for more details.                 *
- *                                                                        *
- *   You should have received a copy of the GNU General Public License    *
- *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
- *                                                                        *
- **************************************************************************/
+/*************************************************************************
+ *
+ *  This file is part of DFTCXX.
+ *
+ *  Author: Ivo Filot <i.a.w.filot@tue.nl>
+ *
+ *  DFTCXX is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  DFTCXX is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ************************************************************************/
 
 #include "moleculargrid.h"
 
@@ -48,7 +48,7 @@ GridPoint::GridPoint(const vec3& _r):
  *
  * @return void
  */
-void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
+void GridPoint::set_basis_func_amp(std::shared_ptr<Molecule> _mol) {
     unsigned int size = _mol->get_nr_bfs();
     this->basis_func_amp = VectorXd(size);
 
@@ -66,20 +66,8 @@ void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
  * @return void
  */
 void GridPoint::set_density(const MatrixXXd& D) {
-    this->density = this->basis_func_amp.dot(D * this->basis_func_amp);
-}
-
-/**
- * @fn scale_density
- *
- * @brief multiplies density at gridpoint with factor
- *
- * @param factor multiplication factor
- *
- * @return void
- */
-void GridPoint::scale_density(double factor) {
-    this->density *= factor;
+    this->density = 2.0 * this->basis_func_amp.dot(
+                        D * this->basis_func_amp);
 }
 
 /*
@@ -157,9 +145,6 @@ VectorXd MolecularGrid::get_densities() const {
 MatrixXXd MolecularGrid::get_amplitudes() const {
     MatrixXXd amplitudes = MatrixXXd(this->mol->get_nr_bfs(), this->grid.size());
 
-    #ifdef HAS_OPENMP
-    #pragma omp parallel for
-    #endif
     for(unsigned int i=0; i<this->grid.size(); i++) {
         const VectorXd bfs = this->grid[i].get_basis_func_amp();
         for(unsigned int j=0; j<this->mol->get_nr_bfs(); j++) {
@@ -168,23 +153,6 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
     }
 
     return amplitudes;
-}
-
-/**
- * @fn renormalize_density
- * @brief normalize density at gridpoints so that sum equals all electrons
- *
- * @return void
- */
-void MolecularGrid::renormalize_density(unsigned int nr_elec) {
-    double factor = (double)nr_elec / this->calculate_density();
-
-    #ifdef HAS_OPENMP
-    #pragma omp parallel for
-    #endif
-    for(unsigned int i=0; i<this->grid.size(); i++) {
-        this->grid[i].scale_density(factor);
-    }
 }
 
 /**
@@ -198,9 +166,6 @@ void MolecularGrid::renormalize_density(unsigned int nr_elec) {
  */
 double MolecularGrid::calculate_density() const {
     double sum = 0.0;
-    #ifdef HAS_OPENMP
-    #pragma omp parallel for reduction ( + : sum)
-    #endif
     for(unsigned int i=0; i<this->grid.size(); i++) {
         sum += this->grid[i].get_weight() * this->grid[i].get_density();
     }
@@ -219,9 +184,6 @@ double MolecularGrid::calculate_density() const {
  * numerical integration is carried out over all the atomic grids. The
  * contribution of the atomic grid to the overall integration over the
  * whole molecule is controlled via a weight factor as defined by Becke.
- *
- * Reference: A.D. Becke, J.Chem.Phys. 88, 2547, (1988)
- * Link: http://dx.doi.org/10.1063/1.454033
  *
  * @return void
  */
@@ -262,27 +224,30 @@ void MolecularGrid::create_grid(unsigned int fineness) {
     // The Lebedev coefficients and radial points are stored in a large matrix.
     // Given a particular order for the integration, we have to start reading
     // this matrix from a specific position. Here, we calculate that position.
-    unsigned int lebedev_offset = 0;
+    lebedev_offset = 0;
     for(unsigned int i=0; i<this->lebedev_order; i++) {
         lebedev_offset += Quadrature::num_lebedev_points[i];
     }
 
     // generate for each atom an atomic grid
     for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
+        // add atomic density
+        this->atomic_densities.push_back(0);
+
         // set the position of atom 1
         const vec3 p1 = this->mol->get_atom(i).get_position();
 
         // construct grid points
         unsigned int grid_start = this->grid.size();
-        double f = pi / (double)(radial_points + 1);
+        const double f = pi / (double)(this->radial_points + 1);
 
         // loop over all the radial points
-        for(unsigned int p=1; p<=radial_points; p++) {
+        for(unsigned int p=1; p<=this->radial_points; p++) {
             // calculate weight function of the Gauss-Chebyshev integration
             double w = f * std::pow(std::sin(f * (double)p), 2.0);
 
             // calculate x point in the interval [-1,1] for Gauss-Chebyshev integration
-            const double x = std::cos(f * (double)p);
+            double x = std::cos(f * (double)p);
 
             // convert x to r so that the interval is converted from [-1,1] to [0, infinity]
             const double r = (1.0 + x) / (1.0 - x);
@@ -320,9 +285,6 @@ void MolecularGrid::create_grid(unsigned int fineness) {
         }
 
         // calculate the Becke weights for the atomic grids
-        #ifdef HAS_OPENMP
-        #pragma omp parallel for schedule(dynamic)
-        #endif
         for(unsigned int g=grid_start; g<grid_stop; g++) {
 
             double denom = 0.0;
@@ -344,11 +306,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
         }
     }
 
-    // finally loop over all gridpoints again and
-    // correct the weights for the Jacobian r**2
-    #ifdef HAS_OPENMP
-    #pragma omp parallel for
-    #endif
+    // correct the weights for the Jacobian r**2 and the 4PI from the Lebedev quadrature
     for(unsigned int i=0; i<grid.size(); i++) {
         this->grid[i].multiply_weight((this->grid[i].get_position() - this->grid[i].get_atom_position()).squaredNorm() * 4.0 * pi);
     }
@@ -369,7 +327,6 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
     double wprod = 1.0;
     const vec3 p1 = this->mol->get_atom(atnr).get_position();
-    unsigned int at1 = this->mol->get_atom(atnr).get_charge();
 
     for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
         if(atnr == j) {
@@ -382,35 +339,10 @@ double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
                     - (p0 - p2).norm() )/
                       (p2-p1).norm();
 
-        // correct mu for hetero-atoms
-        unsigned int at2 = this->mol->get_atom(j).get_charge();
-
-        if(at1 != at2) {
-            mu += this->get_becke_mu_correction_hetero_atoms(at1, at2, mu);
-        }
-
         wprod *= this->cutoff(mu);
     }
 
     return wprod;
-}
-
-/**
- * @brief      Gets a correction factor for the Becke mu
- *
- * @param[in]  at1   atomic number of atom 1
- * @param[in]  at2   atomic number of atom 2
- *
- * @return     mu correction factor
- */
-double MolecularGrid::get_becke_mu_correction_hetero_atoms(unsigned int at1, unsigned int at2, double mu) {
-    double chi = bragg_radii[at1-1]/bragg_radii[at2-1];
-    double u = (chi - 1.) / (chi + 1.);
-    double a = u / (u * u - 1);
-    a = std::min(a, 0.5);
-    a = std::max(a, -0.5);
-
-    return a * (1.0 - mu * mu);
 }
 
 /**
@@ -422,7 +354,7 @@ double MolecularGrid::get_becke_mu_correction_hetero_atoms(unsigned int at1, uns
  * @return double Becke weight value
  */
 double MolecularGrid::cutoff(double mu) {
-    return 0.5 * (1.0 - this->fk(3.0, mu));
+    return 0.5 * (1.0 - this->fk(3, mu));
 }
 
 /**
@@ -440,6 +372,59 @@ double MolecularGrid::fk(unsigned int k, double mu) {
     }
 
     return mu;
+}
+
+void MolecularGrid::output_density(const MatrixXXd& D) {
+    const double distx = 10.0;
+    const double disty = 10.0;
+    const double distz = 10.0;
+
+    const unsigned nrpoints = 100;
+
+    const double dx = distx / (double)(nrpoints - 1);
+    const double dy = disty / (double)(nrpoints - 1);
+    const double dz = distz / (double)(nrpoints - 1);
+
+    unsigned int counter = 0;
+
+    std::cout << "electron density" << std::endl;
+    std::cout << "    1.00000" << std::endl;
+    std::cout << distx << "    0    0" << std::endl;
+    std::cout << "0    " << disty << "    0" << std::endl;
+    std::cout << "0    0    " << distz << std::endl;
+    std::cout << "0" << std::endl;
+    std::cout << "Direct" << std::endl;
+    std::cout << std::endl;
+    std::cout << nrpoints << "  " << nrpoints << "  " << nrpoints << std::endl;
+
+    for(unsigned int k=0; k<nrpoints; k++) {
+        for(unsigned int l=0; l<nrpoints; l++) {
+            for(unsigned int m=0; m<nrpoints; m++) {
+                double x = m * dx - distx / 2.0;
+                double y = l * dy - disty / 2.0;
+                double z = k * dz - distz / 2.0;
+
+                double value = 0.0;
+                for(unsigned int i=0; i<this->mol->get_nr_bfs(); i++) {
+                    for(unsigned int j=0; j<this->mol->get_nr_bfs(); j++) {
+                        value = 2.0 * D(i,j) *
+                                this->mol->get_cgf(i).get_amp(vec3(x,y,z)) *
+                                this->mol->get_cgf(j).get_amp(vec3(x,y,z));
+                    }
+                }
+
+                std::cout << value << "\t";
+
+                if(counter == 6) {
+                    counter = 0;
+                    std::cout << std::endl;
+                    continue;
+                }
+
+                counter++;
+            }
+        }
+    }
 }
 
 void MolecularGrid::calculate_hartree_potential() {
@@ -474,9 +459,6 @@ void MolecularGrid::calculate_rho_lm() {
     // create vector holding r values (i.e. distance to atomic center)
     this->r_n = VectorXd(this->grid.size() / this->angular_points);
 
-    // create vector holding values of spherical harmonics
-    VectorXd sh = VectorXd::Zero(n);
-
     VectorXd weights = this->get_weights();
     VectorXd densities = this->get_densities();
     VectorXd rho_n = weights.cwiseProduct(densities);
@@ -503,7 +485,7 @@ void MolecularGrid::calculate_rho_lm() {
 
                     // get cartesian coordinates
                     vec3 pos = this->grid[idx].get_position();
-                    double w = Quadrature::lebedev_coefficients[j + lebedev_offset][3];
+                    const double w = Quadrature::lebedev_coefficients[j + lebedev_offset][3];
 
                     // convert to spherical coordinates
                     double r = pos.norm(); // due to unit sphere
@@ -511,9 +493,6 @@ void MolecularGrid::calculate_rho_lm() {
                     double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
 
                     double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
-                    if(i == 0) {
-                        sh(n) += w * y_lm * y_lm;
-                    }
 
                     this->rho_lm(i, n) += densities(idx) * y_lm * w;
                 }
@@ -528,7 +507,7 @@ void MolecularGrid::calculate_rho_lm() {
 void MolecularGrid::calculate_U_lm() {
     unsigned int N = this->grid.size() / this->angular_points;
 
-    static const double sqrt4pi = sqrt(4 * M_PI);
+    static const double sqrt4pi = std::sqrt(4.0 * M_PI);
 
     std::vector<double> atomic_density;
     atomic_density.resize(this->mol->get_nr_atoms(), 0.0);
@@ -547,129 +526,130 @@ void MolecularGrid::calculate_U_lm() {
         std::cout << "Atomic density on " << i+1 << ": " << atomic_density[i] << std::endl;
     }
 
-    double q_n = 2.0;   // hardcoded for He at the moment
+    double q_n = atomic_density[0];
 
     double c1 = 0.0;    // constant for d2U/dz2
-    double c2 = 0.0;    // constant for dU/dz
+    double c2 = 0.0;    // constant for (dU/dz)^2
 
-    const double h = 1.0 / (double)N;
+    const double h = 1.0 / (double)(N + 1);
 
     // calculate the size of the vector given a maximum angular quantum number
-    unsigned int n = 0;
+    unsigned int lm = 0;
     for(int l=0; l <= lmax; l++) {
-        n += 2 * l + 1;
+        lm += 2 * l + 1;
     }
 
-    // expand vector have appropriate size
-    U_lm = MatrixXXd::Zero(this->grid.size() / this->angular_points, n);
+    // construct the finite difference matrix
+    MatrixXXd A = MatrixXXd::Zero(N+2,N+2);
 
-    n=0;
+    // start constructing matrix
+    for(unsigned int i=0; i<N+2; i++) {
+
+        if(i > 0 && i < N+1) {
+            c1 = dzdrsq(r_n(i-1), 1.0);
+            c2 = d2zdr2(r_n(i-1), 1.0);
+        }
+
+        if(i == 0) {
+            A(0,0) = 1.0;
+            continue;
+        }
+        if(i == 1) {
+            c1 /= 12.0 * h * h;
+            c2 /= 12.0 * h;
+            A(i,0) = 11.0 * c1 -3.0 * c2;
+            A(i,1) = -20.0 * c1 - 10.0 * c2;
+            A(i,2) = 6.0 * c1 + 18.0 * c2;
+            A(i,3) = 4.0 * c1 - 6.0 * c2;
+            A(i,4) = -1.0 * c1 + 1.0 * c2;
+            continue;
+        }
+        if(i == 2) {
+            c1 /= 12.0 * h*h;
+            c2 /= 60.0 * h;
+            A(i,0) = -1.0 * c1 + 3.0 * c2;
+            A(i,1) = 16.0 * c1 - 30.0 * c2;
+            A(i,2) = -30.0 * c1 - 20.0 * c2;
+            A(i,3) = 16.0 * c1 + 60.0 * c2;
+            A(i,4) = -1.0 * c1 - 15.0 * c2;
+            A(i,5) = 0.0 * c1 + 2.0 * c2;
+            continue;
+        }
+        if(i == N-1) {
+            c1 /= 12.0 * h*h;
+            c2 /= 60.0 * h;
+            A(i,N-4) = 0.0 * c1 - 2.0 * c2;
+            A(i,N-3) = -1.0 * c1 + 15.0 * c2;
+            A(i,N-2) = 16.0 * c1 - 60.0 * c2;
+            A(i,N-1) = -30.0 * c1 + 20.0 * c2;
+            A(i,N ) = 16.0 * c1 + 30.0 * c2;
+            A(i,N+1) = -1.0 * c1 - 3.0 * c2;
+            continue;
+        }
+        if(i == N) {
+            c1 /= 12.0 * h * h;
+            c2 /= 12.0 * h;
+            A(i,N-3) = -1.0 * c1 - 1.0 * c2;
+            A(i,N-2) = 4.0 * c1 + 6.0 * c2;
+            A(i,N-1) = 6.0 * c1 - 18.0 * c2;
+            A(i,N  ) = -20.0 * c1 + 10.0 * c2;
+            A(i,N+1) = 11.0 * c1 + 3.0 * c2;
+            continue;
+        }
+        if(i == N+1) {
+            A(i,i) = 1.0;
+            continue;
+        }
+        c1 /= 180.0 * h*h;
+        c2 /= 60.0 * h;
+        A(i,i-3) = 2.0 * c1 - 1.0 * c2;
+        A(i,i-2) = -27.0 * c1 + 9.0 * c2;
+        A(i,i-1) = 270.0 * c1 - 45.0 * c2;
+        A(i,i)   = -490.0 * c1;
+        A(i,i+1) = 270.0 * c1 + 45.0 * c2;
+        A(i,i+2) = -27.0 * c1 - 9.0 * c2;
+        A(i,i+3) = 2.0 * c1 + 1.0 * c2;
+    } // end constructing matrix
+
+    // expand vector have appropriate size
+    U_lm = MatrixXXd::Zero(N, lm);
+
+    unsigned int n=0;
     // for each lm value, calculate the Ulm value
     for(int l=0; l<=lmax; l++) {
         for(int m=-l; m<=l; m++) {
-            // construct the finite difference matrix
-            MatrixXXd A = MatrixXXd::Zero(N,N);
+            // construct the divergence vector
+            VectorXd g = VectorXd::Zero(N+2);
+            MatrixXXd M(A); // make a copy of matrix A
 
-            // construct the divergence matrix
-            VectorXd g = VectorXd::Zero(N);
-
-            // start constructing matrix
-            for(unsigned int i=0; i<N; i++) {
-                double m = 1.0;
-
-                if(i != N-1) {
-                    c1 = dzdrsq(r_n(i), 1.0);
-                    c2 = dz2dr2(r_n(i), 1.0);
-                }
-
+            // construct divergence vector
+            for(unsigned int i=0; i<N+2; i++) {
                 if(i == 0) {
-                    A(i,0) = 1.0;
-                    if(l == m && m == 0) {
+                    if(n == 0) {
                         g(i) = sqrt4pi * q_n;
                     } else {
                         g(i) = 0.0;
                     }
                     continue;
                 }
-                if(i == 1) {
-                    c1 /= 12.0 * h * h;
-                    c2 /= 60.0 * h;
-                    A(i,0) = 10.0 * c1 -12.0 * c2;
-                    A(i,1) = -15.0 * c1 - 65.0 * c2;
-                    A(i,2) = -4.0 * c1 + 120.0 * c2;
-                    A(i,3) = 14.0 * c1 - 60.0 * c2;
-                    A(i,4) = -6.0 * c1 + 20.0 * c2;
-                    A(i,5) = 1.0 * c1 - 3.0 * c2;
-                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
-                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
-                    continue;
-                }
-                if(i == 2) {
-                    c1 /= 180.0 * h*h;
-                    c2 /= 60.0 * h;
-                    A(i,0) = -13.0 * c1 + 2.0 * c2;
-                    A(i,1) = 228.0 * c1 - 24.0 * c2;
-                    A(i,2) = -420.0 * c1 - 35.0 * c2;
-                    A(i,3) = 200.0 * c1 + 80.0 * c2;
-                    A(i,4) = 15.0 * c1 - 30.0 * c2;
-                    A(i,5) = -12.0 * c1 + 8.0 * c2;
-                    A(i,6) = 2.0 * c1 - 1.0 * c2;
-                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
-                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
-                    continue;
-                }
-                if(i == N-3) {
-                    c1 /= 180.0 * h*h;
-                    c2 /= 60.0 * h;
-                    A(i,N-1) = -13.0 * c1 + 2.0 * c2;
-                    A(i,N-2) = 228.0 * c1 - 24.0 * c2;
-                    A(i,N-3) = -420.0 * c1 - 35.0 * c2;
-                    A(i,N-4) = 200.0 * c1 + 80.0 * c2;
-                    A(i,N-5) = 15.0 * c1 - 30.0 * c2;
-                    A(i,N-6) = -12.0 * c1 + 8.0 * c2;
-                    A(i,N-7) = 2.0 * c1 - 1.0 * c2;
-                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
-                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
-                    continue;
-                }
-                if(i == N-2) {
-                    c1 /= 12.0 * h * h;
-                    c2 /= 60.0 * h;
-                    A(i,N-1) = 10.0 * c1 -12.0 * c2;
-                    A(i,N-2) = -15.0 * c1 - 65.0 * c2;
-                    A(i,N-3) = -4.0 * c1 + 120.0 * c2;
-                    A(i,N-4) = 14.0 * c1 - 60.0 * c2;
-                    A(i,N-5) = -6.0 * c1 + 20.0 * c2;
-                    A(i,N-6) = 1.0 * c1 - 3.0 * c2;
-                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
-                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
-                    continue;
-                }
-                if(i == N-1) {
-                    A(i,i) = 1.0;
+                if(i == N+1) {
                     g(i) = 0.0;
                     continue;
                 }
-                c1 /= 180.0 * h*h;
-                c2 /= 60.0 * h;
-                A(i,i-3) = 2.0 * c1 - 1.0 * c2;
-                A(i,i-2) = -27.0 * c1 + 9.0 * c2;
-                A(i,i-1) = 270.0 * c1 - 45.0 * c2;
-                A(i,i)   = -490.0 * c1;
-                A(i,i+1) = 270.0 * c1 + 45.0 * c2;
-                A(i,i+2) = -27.0 * c1 - 9.0 * c2;
-                A(i,i+3) = 2.0 * c1 + 1.0 * c2;
-                g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
-                A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
+                if(i > 0 && i < N+1) {
+                    M(i,i) -= (double)l * (double)(l+1) / (r_n(i-1) * r_n(i-1));
+                    g(i) = -4.0 * M_PI * r_n(i-1) * this->rho_lm(i-1,n);
+                }
             } // end constructing matrix
 
-            Eigen::PartialPivLU<MatrixXXd> dec(A);
+            Eigen::PartialPivLU<MatrixXXd> dec(M);
             VectorXd b = dec.solve(g);
 
             // place b vector back into U_lm
-            for(unsigned int i=0; i<N; i++) {
-                this->U_lm(i,n) = b(i);
+            for(unsigned int i=1; i<N+1; i++) {
+                this->U_lm(i-1,n) = b(i);
             }
+            n++;
         }
     }
 
@@ -681,9 +661,9 @@ void MolecularGrid::calculate_U_lm() {
         n = 0;
         for(int l=0; l<=lmax; l++) {
             for(int m=-l; m<=l; m++) {
-                double pre = this->prefactor_spherical_harmonic(l, m);
+                const double pre = this->prefactor_spherical_harmonic(l, m);
                 for(unsigned int j=0; j<this->angular_points; j++) {
-                    // get index positions
+                    // get grid index positions
                     unsigned int idx = i * angular_points + j;
 
                     // get cartesian coordinates
@@ -695,15 +675,28 @@ void MolecularGrid::calculate_U_lm() {
                     double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
 
                     double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
-                    V(idx) += 1.0/r * y_lm * U_lm(i,n);
+                    V(idx) += 1.0 / r * y_lm * U_lm(i,n);
                 }
                 n++;
             }
         }
     }
 
-    VectorXd Vd = densities.cwiseProduct(V);
-    std::cout << weights.dot(Vd) << std::endl;
+    MatrixXXd amplitudes  = this->get_amplitudes();
+    VectorXd Vp = weights.cwiseProduct(V);
+    VectorXd row = amplitudes.row(0);
+    const unsigned int size = this->mol->get_nr_bfs();
+    MatrixXXd Jj = MatrixXXd::Zero(size, size);
+
+    for(unsigned int i=0; i<size; i++) {
+        VectorXd row = amplitudes.row(i);
+        VectorXd row_i = Vp.cwiseProduct(row);
+        for(unsigned int j=i; j<size; j++) {
+            Jj(i,j) = Jj(j,i) = row_i.dot(amplitudes.row(j)) / 2.0;
+        }
+    }
+
+    std::cout << "Numerical approximation of Jj: " << Jj << std::endl;
 }
 
 double MolecularGrid::spherical_harmonic(int l, int m, double pole, double azimuth) const {
@@ -806,7 +799,7 @@ double MolecularGrid::legendre_p (int n, int m, double x) const {
     return v[n];
 }
 
-double MolecularGrid::dz2dr2(double r, double m) {
+double MolecularGrid::d2zdr2(double r, double m) {
     double nom = m*m * (m + 3.0 * r);
     double denom = 2.0 * M_PI * std::pow((m * r) / ((m+r)*(m+r)),1.5) * std::pow(m+r,5.0);
     return nom/denom;

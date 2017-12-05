@@ -1,38 +1,33 @@
-/**************************************************************************
- *   moleculargrid.h  --  This file is part of DFTCXX.                    *
- *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
- *                                                                        *
- *   DFTCXX is free software:                                             *
- *   you can redistribute it and/or modify it under the terms of the      *
- *   GNU General Public License as published by the Free Software         *
- *   Foundation, either version 3 of the License, or (at your option)     *
- *   any later version.                                                   *
- *                                                                        *
- *   DFTCXX is distributed in the hope that it will be useful,            *
- *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
- *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
- *   See the GNU General Public License for more details.                 *
- *                                                                        *
- *   You should have received a copy of the GNU General Public License    *
- *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
- *                                                                        *
- **************************************************************************/
+/*************************************************************************
+ *
+ *  This file is part of DFTCXX.
+ *
+ *  Author: Ivo Filot <i.a.w.filot@tue.nl>
+ *
+ *  DFTCXX is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or
+ *  (at your option) any later version.
+ *
+ *  DFTCXX is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ************************************************************************/
 
 #ifndef _MOLECULAR_GRID_H
 #define _MOLECULAR_GRID_H
 
-#ifdef HAS_OPENMP
-#include <mutex>
-#endif
-
 #include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
+#include <cmath>
 
 #include "molecule.h"
 #include "quadrature.h"
-
-#include "bragg.h"
 
 typedef Eigen::Vector3d vec3;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
@@ -115,7 +110,7 @@ public:
      *
      * @return void
      */
-    void set_basis_func_amp(const std::shared_ptr<Molecule>& _mol);
+    void set_basis_func_amp(std::shared_ptr<Molecule> _mol);
 
     /**
      * @fn set_density
@@ -126,18 +121,6 @@ public:
      * @return void
      */
     void set_density(const MatrixXXd& D);
-
-
-    /**
-     * @fn scale_density
-     *
-     * @brief multiplies density at gridpoint with factor
-     *
-     * @param factor multiplication factor
-     *
-     * @return void
-     */
-    void scale_density(double factor);
 
     /*
      * GETTERS
@@ -291,13 +274,7 @@ public:
      */
     MatrixXXd get_amplitudes() const;
 
-    /**
-     * @fn renormalize_density
-     * @brief normalize density at gridpoints so that sum equals all electrons
-     *
-     * @return void
-     */
-    void renormalize_density(unsigned int nr_elec);
+    void output_density(const MatrixXXd& D);
 
 private:
     static constexpr double pi = 3.14159265358979323846;
@@ -337,10 +314,7 @@ private:
      *
      * @return void
      */
-    void create_grid(unsigned int fineness = GRID_MEDIUM);
-
-    void calculate_rho_lm();
-    void calculate_U_lm();
+    void create_grid(unsigned int fineness);
 
     /**
      * @fn get_becke_weight_pn
@@ -356,40 +330,14 @@ private:
      */
     double get_becke_weight_pn(unsigned int atnr, const vec3& p0);
 
-    /**
-     * @brief      Gets a correction factor for the Becke mu
-     *
-     * @param[in]  at1   atomic number of atom 1
-     * @param[in]  at2   atomic number of atom 2
-     * @param[in]  mu    Becke weight value
-     *
-     * @return     mu correction factor
-     */
-    double get_becke_mu_correction_hetero_atoms(unsigned int at1, unsigned int at2, double mu);
+    void calculate_rho_lm();
+    void calculate_U_lm();
 
     /*
      * auxiliary functions for the Becke grid
      */
 
-    /**
-     * @fn cutoff
-     * @brief calculates the Becke weight
-     *
-     * @param fineness      mu (elliptical coordinate)
-     *
-     * @return double Becke weight value
-     */
     double cutoff(double mu);
-
-    /**
-     * @fn fk
-     * @brief recursive function to have smooth overlapping atomic grids
-     *
-     * @param k     number of iterations
-     * @param mu    elliptical coordinate
-     *
-     * @return value
-     */
     double fk(unsigned int k, double mu);
 
     double spherical_harmonic(int l, int m, double pole, double azimuth) const;
@@ -399,7 +347,7 @@ private:
     double legendre (int n, double x) const;
     double legendre_p (int n, int m, double x) const;
 
-    double dz2dr2(double r, double m);
+    double d2zdr2(double r, double m);
     double dzdrsq(double r, double m);
 };
 
