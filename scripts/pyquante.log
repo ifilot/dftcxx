@@ -1,0 +1,4 @@
+WARNING:root:openbabel not found in path, switching to PyQuante backend
+WARNING:root:libint extension not found, switching to normal ERI computation
+WARNING:root:openbabel not found in path, switching to PyQuante backend
+WARNING:root:libint extension not found, switching to normal ERI computation

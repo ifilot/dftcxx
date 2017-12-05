@@ -117,6 +117,9 @@ void DFT::scf() {
     std::cout << "========================================" << std::endl;
     std::cout << "Stopping because energy criterion is reached." << std::endl;
     std::cout << std::endl;
+
+    std::cout << "Coulomb repulsion: " << this->J << std::endl;
+    this->molgrid->calculate_hartree_potential();
 }
 
 /**

@@ -227,43 +227,44 @@ double MolecularGrid::calculate_density() const {
  */
 void MolecularGrid::create_grid(unsigned int fineness) {
 
-    // variables controlling the resolution of the radial and angular grid
-    unsigned int radial_points;
-    unsigned int lebedev_order = 0;
-
     // set the resolution of the grid
     switch(fineness) {
         case GRID_COARSE:
-            radial_points = 10;
-            lebedev_order = Quadrature::LEBEDEV_50;
+            this->radial_points = 10;
+            this->lebedev_order = Quadrature::LEBEDEV_50;
+            this->lmax = 5;
         break;
         case GRID_MEDIUM:
-            radial_points = 15;
-            lebedev_order = Quadrature::LEBEDEV_110;
+            this->radial_points = 15;
+            this->lebedev_order = Quadrature::LEBEDEV_110;
+            this->lmax = 8;
         break;
         case GRID_FINE:
-            radial_points = 20;
-            lebedev_order = Quadrature::LEBEDEV_146;
+            this->radial_points = 20;
+            this->lebedev_order = Quadrature::LEBEDEV_146;
+            this->lmax = 10;
         break;
         case GRID_ULTRAFINE:
-            radial_points = 30;
-            lebedev_order = Quadrature::LEBEDEV_194;
+            this->radial_points = 30;
+            this->lebedev_order = Quadrature::LEBEDEV_194;
+            this->lmax = 11;
         break;
         default: // medium settings
-            radial_points = 15;
-            lebedev_order = Quadrature::LEBEDEV_110;
+            this->radial_points = 15;
+            this->lebedev_order = Quadrature::LEBEDEV_110;
+            this->lmax = 8;
         break;
     }
 
     // calculate number of angular points
-    const unsigned int angular_points = Quadrature::num_lebedev_points[lebedev_order];
+    this->angular_points = Quadrature::num_lebedev_points[this->lebedev_order];
 
     // The Lebedev coefficients and radial points are stored in a large matrix.
     // Given a particular order for the integration, we have to start reading
     // this matrix from a specific position. Here, we calculate that position.
-    unsigned int start = 0;
-    for(unsigned int i=0; i<lebedev_order; i++) {
-        start += Quadrature::num_lebedev_points[i];
+    unsigned int lebedev_offset = 0;
+    for(unsigned int i=0; i<this->lebedev_order; i++) {
+        lebedev_offset += Quadrature::num_lebedev_points[i];
     }
 
     // generate for each atom an atomic grid
@@ -291,7 +292,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
                  2.0 / std::pow(1.0 - x, 2.0);
 
             // loop over all the angular points
-            for(unsigned int a=start; a<angular_points + start; a++) {
+            for(unsigned int a=lebedev_offset; a<this->angular_points + lebedev_offset; a++) {
                 // create a new grid point given the coordinates on the unit sphere; these
                 // coordinates are multiplied by the radius as calculated above
                 this->grid.push_back(GridPoint(p1 + vec3(Quadrature::lebedev_coefficients[a][0],
@@ -311,6 +312,12 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             }
         }
         unsigned int grid_stop = this->grid.size();
+
+        // if there is only one atom in the system, just ignore the
+        // the Becke grid part below and continue
+        if(this->mol->get_nr_atoms() == 1) {
+            continue;
+        }
 
         // calculate the Becke weights for the atomic grids
         #ifdef HAS_OPENMP
@@ -433,4 +440,378 @@ double MolecularGrid::fk(unsigned int k, double mu) {
     }
 
     return mu;
+}
+
+void MolecularGrid::calculate_hartree_potential() {
+    this->calculate_rho_lm();
+    this->calculate_U_lm();
+}
+
+/**
+ * @fn calculate_rho_lm
+ * @brief Calculate rho_lm from rho_n
+ *
+ * For each radial point rho_r(r), the values rho(r, theta, phi) can be calculated
+ * by summing over rho_lm(r) * Y_lm(theta, phi). Here, the coefficients rho_lm
+ * are calculated for the spherical harmonic expansion of the electron density.
+ * From this expansion, the Hartree potential can be evaluated.
+ *
+ * @return void
+ */
+void MolecularGrid::calculate_rho_lm() {
+    // calculate the size of the vector given a maximum angular quantum number
+    unsigned int n = 0;
+    for(int l=0; l <= lmax; l++) {
+        n += 2 * l + 1;
+    }
+
+    // expand vector have appropriate size
+    rho_lm = MatrixXXd::Zero(this->grid.size() / this->angular_points, n);
+
+    // create vector holding the radial electron density
+    VectorXd rho_r = VectorXd::Zero(this->grid.size() / this->angular_points);
+
+    // create vector holding r values (i.e. distance to atomic center)
+    this->r_n = VectorXd(this->grid.size() / this->angular_points);
+
+    // create vector holding values of spherical harmonics
+    VectorXd sh = VectorXd::Zero(n);
+
+    VectorXd weights = this->get_weights();
+    VectorXd densities = this->get_densities();
+    VectorXd rho_n = weights.cwiseProduct(densities);
+
+    for(unsigned int i=0; i<this->grid.size() / this->angular_points; i++) {
+        n = 0;
+
+        // calculate radial distance for each radial grid point
+        this->r_n(i) = this->grid[i * this->angular_points].get_position().norm();
+
+        // calculate total radial density
+        for(unsigned int j=0; j<this->angular_points; j++) {
+            unsigned int idx = i * angular_points + j;
+            rho_r(i) += rho_n(idx);
+        }
+
+        // calculate rho_lm from the radial density and the spherical harmonics
+        for(int l=0; l<=lmax; l++) {
+            for(int m=-l; m<=l; m++) {
+                double pre = this->prefactor_spherical_harmonic(l, m);
+                for(unsigned int j=0; j<this->angular_points; j++) {
+                    // get index positions
+                    unsigned int idx = i * angular_points + j;
+
+                    // get cartesian coordinates
+                    vec3 pos = this->grid[idx].get_position();
+                    double w = Quadrature::lebedev_coefficients[j + lebedev_offset][3];
+
+                    // convert to spherical coordinates
+                    double r = pos.norm(); // due to unit sphere
+                    double azimuth = std::atan2(pos(1),pos(0));
+                    double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
+
+                    double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
+                    if(i == 0) {
+                        sh(n) += w * y_lm * y_lm;
+                    }
+
+                    this->rho_lm(i, n) += densities(idx) * y_lm * w;
+                }
+                this->rho_lm(i, n) *= 4.0 * M_PI;
+
+                n++;
+            }
+        }
+    }
+}
+
+void MolecularGrid::calculate_U_lm() {
+    unsigned int N = this->grid.size() / this->angular_points;
+
+    static const double sqrt4pi = sqrt(4 * M_PI);
+
+    std::vector<double> atomic_density;
+    atomic_density.resize(this->mol->get_nr_atoms(), 0.0);
+
+    VectorXd weights = this->get_weights();
+    VectorXd densities = this->get_densities();
+
+    // calculate total electron density per atom
+    for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
+        for(unsigned int j=0; j<this->radial_points; j++) {
+            for(unsigned int k=0; k<this->angular_points; k++) {
+                unsigned int idx = j * angular_points + k;
+                atomic_density[i] += weights(idx) * densities(idx);
+            }
+        }
+        std::cout << "Atomic density on " << i+1 << ": " << atomic_density[i] << std::endl;
+    }
+
+    double q_n = 2.0;   // hardcoded for He at the moment
+
+    double c1 = 0.0;    // constant for d2U/dz2
+    double c2 = 0.0;    // constant for dU/dz
+
+    const double h = 1.0 / (double)N;
+
+    // calculate the size of the vector given a maximum angular quantum number
+    unsigned int n = 0;
+    for(int l=0; l <= lmax; l++) {
+        n += 2 * l + 1;
+    }
+
+    // expand vector have appropriate size
+    U_lm = MatrixXXd::Zero(this->grid.size() / this->angular_points, n);
+
+    n=0;
+    // for each lm value, calculate the Ulm value
+    for(int l=0; l<=lmax; l++) {
+        for(int m=-l; m<=l; m++) {
+            // construct the finite difference matrix
+            MatrixXXd A = MatrixXXd::Zero(N,N);
+
+            // construct the divergence matrix
+            VectorXd g = VectorXd::Zero(N);
+
+            // start constructing matrix
+            for(unsigned int i=0; i<N; i++) {
+                double m = 1.0;
+
+                if(i != N-1) {
+                    c1 = dzdrsq(r_n(i), 1.0);
+                    c2 = dz2dr2(r_n(i), 1.0);
+                }
+
+                if(i == 0) {
+                    A(i,0) = 1.0;
+                    if(l == m && m == 0) {
+                        g(i) = sqrt4pi * q_n;
+                    } else {
+                        g(i) = 0.0;
+                    }
+                    continue;
+                }
+                if(i == 1) {
+                    c1 /= 12.0 * h * h;
+                    c2 /= 60.0 * h;
+                    A(i,0) = 10.0 * c1 -12.0 * c2;
+                    A(i,1) = -15.0 * c1 - 65.0 * c2;
+                    A(i,2) = -4.0 * c1 + 120.0 * c2;
+                    A(i,3) = 14.0 * c1 - 60.0 * c2;
+                    A(i,4) = -6.0 * c1 + 20.0 * c2;
+                    A(i,5) = 1.0 * c1 - 3.0 * c2;
+                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
+                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
+                    continue;
+                }
+                if(i == 2) {
+                    c1 /= 180.0 * h*h;
+                    c2 /= 60.0 * h;
+                    A(i,0) = -13.0 * c1 + 2.0 * c2;
+                    A(i,1) = 228.0 * c1 - 24.0 * c2;
+                    A(i,2) = -420.0 * c1 - 35.0 * c2;
+                    A(i,3) = 200.0 * c1 + 80.0 * c2;
+                    A(i,4) = 15.0 * c1 - 30.0 * c2;
+                    A(i,5) = -12.0 * c1 + 8.0 * c2;
+                    A(i,6) = 2.0 * c1 - 1.0 * c2;
+                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
+                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
+                    continue;
+                }
+                if(i == N-3) {
+                    c1 /= 180.0 * h*h;
+                    c2 /= 60.0 * h;
+                    A(i,N-1) = -13.0 * c1 + 2.0 * c2;
+                    A(i,N-2) = 228.0 * c1 - 24.0 * c2;
+                    A(i,N-3) = -420.0 * c1 - 35.0 * c2;
+                    A(i,N-4) = 200.0 * c1 + 80.0 * c2;
+                    A(i,N-5) = 15.0 * c1 - 30.0 * c2;
+                    A(i,N-6) = -12.0 * c1 + 8.0 * c2;
+                    A(i,N-7) = 2.0 * c1 - 1.0 * c2;
+                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
+                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
+                    continue;
+                }
+                if(i == N-2) {
+                    c1 /= 12.0 * h * h;
+                    c2 /= 60.0 * h;
+                    A(i,N-1) = 10.0 * c1 -12.0 * c2;
+                    A(i,N-2) = -15.0 * c1 - 65.0 * c2;
+                    A(i,N-3) = -4.0 * c1 + 120.0 * c2;
+                    A(i,N-4) = 14.0 * c1 - 60.0 * c2;
+                    A(i,N-5) = -6.0 * c1 + 20.0 * c2;
+                    A(i,N-6) = 1.0 * c1 - 3.0 * c2;
+                    g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
+                    A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
+                    continue;
+                }
+                if(i == N-1) {
+                    A(i,i) = 1.0;
+                    g(i) = 0.0;
+                    continue;
+                }
+                c1 /= 180.0 * h*h;
+                c2 /= 60.0 * h;
+                A(i,i-3) = 2.0 * c1 - 1.0 * c2;
+                A(i,i-2) = -27.0 * c1 + 9.0 * c2;
+                A(i,i-1) = 270.0 * c1 - 45.0 * c2;
+                A(i,i)   = -490.0 * c1;
+                A(i,i+1) = 270.0 * c1 + 45.0 * c2;
+                A(i,i+2) = -27.0 * c1 - 9.0 * c2;
+                A(i,i+3) = 2.0 * c1 + 1.0 * c2;
+                g(i) = -4.0 * M_PI * r_n(i) * this->rho_lm(i,n);
+                A(i,i) -= (double)l * (double)(l+1) / (r_n(i) * r_n(i));
+            } // end constructing matrix
+
+            Eigen::PartialPivLU<MatrixXXd> dec(A);
+            VectorXd b = dec.solve(g);
+
+            // place b vector back into U_lm
+            for(unsigned int i=0; i<N; i++) {
+                this->U_lm(i,n) = b(i);
+            }
+        }
+    }
+
+    VectorXd V = VectorXd::Zero(this->grid.size());
+
+    // calculate V(r, theta, phi) from the radial density and the spherical harmonics
+    // loop over radial points
+    for(unsigned int i=0; i<this->grid.size() / this->angular_points; i++) {
+        n = 0;
+        for(int l=0; l<=lmax; l++) {
+            for(int m=-l; m<=l; m++) {
+                double pre = this->prefactor_spherical_harmonic(l, m);
+                for(unsigned int j=0; j<this->angular_points; j++) {
+                    // get index positions
+                    unsigned int idx = i * angular_points + j;
+
+                    // get cartesian coordinates
+                    vec3 pos = this->grid[idx].get_position();
+
+                    // convert to spherical coordinates
+                    double r = pos.norm(); // due to unit sphere
+                    double azimuth = std::atan2(pos(1),pos(0));
+                    double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
+
+                    double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
+                    V(idx) += 1.0/r * y_lm * U_lm(i,n);
+                }
+                n++;
+            }
+        }
+    }
+
+    VectorXd Vd = densities.cwiseProduct(V);
+    std::cout << weights.dot(Vd) << std::endl;
+}
+
+double MolecularGrid::spherical_harmonic(int l, int m, double pole, double azimuth) const {
+    return this->polar_function(l, m, pole) * this->azimuthal_function(m, azimuth);
+}
+
+double MolecularGrid::prefactor_spherical_harmonic(int l, int m) const {
+    static const double pre = 1.0 / sqrt(4 * M_PI);
+    return pre * (m == 0 ? 1 : sqrt(2.0)) *
+            sqrt((double)(2 * l + 1) * boost::math::factorial<double>(l - std::abs(m)) /
+                 boost::math::factorial<double>(l + std::abs(m)) );
+}
+
+double MolecularGrid::polar_function(int l, int m, double theta) const {
+    return this->legendre_p(l, std::abs(m), cos(theta));
+}
+
+double MolecularGrid::azimuthal_function(int m, double phi) const {
+    if(m == 0) return 1.0;
+
+    if(m > 0) {
+        return cos((double)m * phi);
+    } else {
+        return sin(-(double)m * phi);
+    }
+}
+
+/* legendre function */
+
+double MolecularGrid::legendre (int n, double x) const {
+    int i;
+
+    if(n < 0) {
+        return -1;
+    }
+
+    double v[n];
+        v[0] = 1.0;
+
+    if(n < 1) {
+        return 1.0;
+    }
+
+    v[1] = x;
+
+    for ( i = 2; i <= n; i++ ) {
+          v[i] =     ( ( double ) ( 2 * i - 1 ) * x    * v[i-1]
+                     - ( double ) (     i - 1 ) *        v[i-2] )
+                     / ( double ) (     i     );
+    }
+
+    return v[n];
+}
+
+/* associated legendre function
+ *
+ * note that x should lie between -1 and 1 for this to work, else
+ * a NAN will be returned
+ */
+
+double MolecularGrid::legendre_p (int n, int m, double x) const {
+    double fact;
+    int i;
+    int j;
+    int k;
+    double v[n+1];
+
+    for ( i = 0; i < n + 1; i++ ) {
+        v[i] = 0.0;
+    }
+
+    //
+    //  J = M is the first nonzero function.
+    //
+    if ( m <= n ) {
+        v[m] = 1.0;
+
+        fact = 1.0;
+        for ( k = 0; k < m; k++ ) {
+            v[m] *= - fact * sqrt ( 1.0 - x * x);
+            fact += 2.0;
+        }
+    }
+
+    //
+    //  J = M + 1 is the second nonzero function.
+    //
+    if ( m + 1 <= n ) {
+        v[m+1] = x * ( double ) ( 2 * m + 1 ) * v[m];
+    }
+    //
+    //  Now we use a three term recurrence.
+    //
+    for ( j = m + 2; j <= n; j++ ) {
+          v[j] = ( ( double ) ( 2 * j     - 1 ) * x * v[(j-1)]
+              + ( double ) (   - j - m + 1 ) *        v[(j-2)] )
+              / ( double ) (     j - m     );
+    }
+
+    return v[n];
+}
+
+double MolecularGrid::dz2dr2(double r, double m) {
+    double nom = m*m * (m + 3.0 * r);
+    double denom = 2.0 * M_PI * std::pow((m * r) / ((m+r)*(m+r)),1.5) * std::pow(m+r,5.0);
+    return nom/denom;
+}
+
+double MolecularGrid::dzdrsq(double r, double m) {
+    return m / (M_PI * M_PI * r * (m + r)*(m + r));
 }

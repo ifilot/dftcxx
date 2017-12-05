@@ -261,6 +261,8 @@ public:
      */
     void set_density(const MatrixXXd& P);
 
+    void calculate_hartree_potential();
+
     /*
      *  vector & matrix getters
      */
@@ -304,6 +306,23 @@ private:
 
     std::vector<GridPoint> grid;    // set of all gridpoints
 
+    std::vector<double> atomic_densities;
+
+    unsigned int angular_points;
+    unsigned int radial_points;
+    unsigned int lebedev_order;
+    unsigned int lebedev_offset;
+    int lmax;
+
+    // density coefficients (MXN) matrix where M are the radial points and N the combined lm index
+    MatrixXXd rho_lm;
+
+    // hartree potential coefficient (MXN) matrix where M are the radial points and N the combined lm index
+    MatrixXXd U_lm;
+
+    // vector holding radial distances
+    VectorXd r_n;
+
     /**
      * @fn create_grid
      * @brief creates the molecular grid
@@ -319,6 +338,9 @@ private:
      * @return void
      */
     void create_grid(unsigned int fineness = GRID_MEDIUM);
+
+    void calculate_rho_lm();
+    void calculate_U_lm();
 
     /**
      * @fn get_becke_weight_pn
@@ -369,6 +391,16 @@ private:
      * @return value
      */
     double fk(unsigned int k, double mu);
+
+    double spherical_harmonic(int l, int m, double pole, double azimuth) const;
+    double prefactor_spherical_harmonic(int l, int m) const;
+    double polar_function(int l, int m, double theta) const;
+    double azimuthal_function(int m, double phi) const;
+    double legendre (int n, double x) const;
+    double legendre_p (int n, int m, double x) const;
+
+    double dz2dr2(double r, double m);
+    double dzdrsq(double r, double m);
 };
 
 #endif //_MOLECULAR_GRID_H
