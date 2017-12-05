@@ -22,167 +22,12 @@
 #ifndef _MOLECULAR_GRID_H
 #define _MOLECULAR_GRID_H
 
-#include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
 #include <cmath>
 
 #include "molecule.h"
-#include "quadrature.h"
-
-typedef Eigen::Vector3d vec3;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
-
-/*
- * @class GridPoint
- * @brief Represents a point in the molecular grid
- *
- * Grid point at position r; stores local information such as the amplitude
- * of all the basis functions in the basis set and the local density.
- *
- * Numerical integrations of any kind of property is conducted by
- * evaluating the local value of the functional at the grid point and
- * multiplying this by the weight of the grid point. Integration is then
- * performed by summing over all the grid points.
- *
- * The weights take into account:
- * - the Jacobian for integration into spherical coordinates
- * - the weight for the Lebedev integration (angular part)
- * - the weight for the Gauss-Chebyshev integration (radial part)
- * - the weight for the Becke grid (see: http://dx.doi.org/10.1063/1.454033)
- *
- */
-class GridPoint {
-public:
-    /**
-     * @fn DFT
-     * @brief DFT routine constructor
-     *
-     * @return DFT instance
-     */
-    GridPoint(const vec3& _r);
-
-    /*
-     * SETTERS
-     */
-
-     /**
-     * @fn set_weight
-     * @brief set the weight at the grid point
-     *
-     * @param _w      value of the weight
-     *
-     * @return void
-     */
-    inline void set_weight(double _w) {
-        this->w = _w;
-    }
-
-    /**
-     * @fn multiply_weight
-     * @brief multiply weight by factor at the grid point
-     *
-     * @param _w      weight multiplication factor
-     *
-     * @return void
-     */
-    inline void multiply_weight(double _w) {
-        this->w *= _w;
-    }
-
-    /**
-     * @fn set_atom
-     * @brief defines the atom to which this grid point is 'linked'
-     *
-     * @param at    pointer to Atom class
-     *
-     * @return void
-     */
-    inline void set_atom(const Atom* at) {
-        this->atom = at;
-    }
-
-    /**
-     * @fn set_basis_func_amp
-     * @brief calculates the amplitudes at the grid point of all basis functions
-     *
-     * @param _mol      pointer to the molecule object
-     *
-     * @return void
-     */
-    void set_basis_func_amp(std::shared_ptr<Molecule> _mol);
-
-    /**
-     * @fn set_density
-     * @brief calculates the density at the grid point using the density matrix
-     *
-     * @param _mol      reference to density matrix
-     *
-     * @return void
-     */
-    void set_density(const MatrixXXd& D);
-
-    /*
-     * GETTERS
-     */
-
-     /**
-     * @fn get_position
-     * @brief get the position of the grid point
-     *
-     * @return vec3 position of the grid point
-     */
-    inline const vec3& get_position() const {
-        return this->r;
-    }
-
-    /**
-     * @fn get_atom_position
-     * @brief get the position of the atom to which this grid point is 'linked'
-     *
-     * @return vec3 position of the atom
-     */
-    inline const vec3& get_atom_position() const {
-        return this->atom->get_position();
-    }
-
-    /**
-     * @fn get_weight
-     * @brief get the weight of the grid point in the numerical integration
-     *
-     * @return double weight
-     */
-    inline const double get_weight() const {
-        return this->w;
-    }
-
-    /**
-     * @fn get_density
-     * @brief get the electron density at the grid point
-     *
-     * @return double density
-     */
-    inline const double get_density() const {
-        return this->density;
-    }
-
-    /**
-     * @fn get_basis_func_amp
-     * @brief get the amplitude of the basis functions
-     *
-     * @return (Eigen3) vector containing basis function amplitudes
-     */
-    inline const VectorXd& get_basis_func_amp() const {
-        return this->basis_func_amp;
-    }
-
-private:
-    const vec3 r;               // position in 3D space
-    double w;                   // weight
-    const Atom* atom;           // atom this gridpoint adheres to
-    VectorXd basis_func_amp;    // amplitude of basis functions at gridpoint
-    double density;             // current density at grid point
-};
+#include "gridpoint.h"
+#include "atomicgrid.h"
 
 /*
  * @class MolecularGrid
@@ -200,6 +45,32 @@ private:
  *
  */
 class MolecularGrid {
+private:
+    static constexpr double pi = 3.14159265358979323846;
+
+    std::shared_ptr<Molecule> mol;                                // pointer to molecule object
+
+    std::vector<std::unique_ptr<AtomicGrid>> atomic_grids;        // vector of pointers to atomic grids
+
+    std::vector<double> atomic_densities;
+
+    unsigned int angular_points;
+    unsigned int radial_points;
+    unsigned int lebedev_order;
+    unsigned int lebedev_offset;
+    int lmax;
+
+    // density coefficients (MXN) matrix where M are the radial points and N the combined lm index
+    MatrixXXd rho_lm;
+
+    // hartree potential coefficient (MXN) matrix where M are the radial points and N the combined lm index
+    MatrixXXd U_lm;
+
+    // vector holding radial distances
+    VectorXd r_n;
+
+    size_t grid_size;
+
 public:
     /**
      * @fn MolecularGrid
@@ -275,28 +146,6 @@ public:
     MatrixXXd get_amplitudes() const;
 
 private:
-    static constexpr double pi = 3.14159265358979323846;
-
-    std::shared_ptr<Molecule> mol;  // pointer to molecule object
-
-    std::vector<GridPoint> grid;    // set of all gridpoints
-
-    std::vector<double> atomic_densities;
-
-    unsigned int angular_points;
-    unsigned int radial_points;
-    unsigned int lebedev_order;
-    unsigned int lebedev_offset;
-    int lmax;
-
-    // density coefficients (MXN) matrix where M are the radial points and N the combined lm index
-    MatrixXXd rho_lm;
-
-    // hartree potential coefficient (MXN) matrix where M are the radial points and N the combined lm index
-    MatrixXXd U_lm;
-
-    // vector holding radial distances
-    VectorXd r_n;
 
     /**
      * @fn create_grid
@@ -328,25 +177,12 @@ private:
      */
     double get_becke_weight_pn(unsigned int atnr, const vec3& p0);
 
-    void calculate_rho_lm();
-    void calculate_U_lm();
-
     /*
      * auxiliary functions for the Becke grid
      */
 
     double cutoff(double mu);
     double fk(unsigned int k, double mu);
-
-    double spherical_harmonic(int l, int m, double pole, double azimuth) const;
-    double prefactor_spherical_harmonic(int l, int m) const;
-    double polar_function(int l, int m, double theta) const;
-    double azimuthal_function(int m, double phi) const;
-    double legendre (int n, double x) const;
-    double legendre_p (int n, int m, double x) const;
-
-    double d2zdr2(double r, double m);
-    double dzdrsq(double r, double m);
 };
 
 #endif //_MOLECULAR_GRID_H

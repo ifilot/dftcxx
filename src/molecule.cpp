@@ -21,6 +21,12 @@
 
 #include "molecule.h"
 
+Atom::Atom() :
+    atnr(0),
+    position(vec3(0,0,0))
+{
+}
+
 Atom::Atom(unsigned int _atnr, const vec3& _position):
     atnr(_atnr),
     position(_position) {
@@ -92,7 +98,7 @@ void Molecule::set_basis_set(const std::string& basis_set) {
     // set information
     unsigned int highest_atom = 0;
     for(unsigned int i=0; i<this->atoms.size(); i++) {
-        highest_atom = std::max(highest_atom, this->atoms[i].get_charge());
+        highest_atom = std::max(highest_atom, this->atoms[i]->get_charge());
     }
 
     // open the file
@@ -168,9 +174,9 @@ void Molecule::set_basis_set(const std::string& basis_set) {
 
         // add basis functions to the atoms
         for(unsigned int i=0; i<this->atoms.size(); i++) {
-            if(this->atoms[i].get_charge() == atnr) {
+            if(this->atoms[i]->get_charge() == atnr) {
                 for(unsigned int j=0; j<bs_cgfs.size(); j++) {
-                    bs_cgfs[j].set_position(this->atoms[i].get_position());
+                    bs_cgfs[j].set_position(this->atoms[i]->get_position());
                     this->add_cgf(i, bs_cgfs[j]);
                 }
             }
@@ -188,7 +194,7 @@ unsigned int Molecule::get_nr_elec() const {
     unsigned int nr_elec = 0;
 
     for(unsigned int i=0; i<this->atoms.size(); i++) {
-        nr_elec += this->atoms[i].get_charge();
+        nr_elec += this->atoms[i]->get_charge();
     }
 
     return nr_elec;
