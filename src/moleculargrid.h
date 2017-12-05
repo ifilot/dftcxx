@@ -274,8 +274,6 @@ public:
      */
     MatrixXXd get_amplitudes() const;
 
-    void output_density(const MatrixXXd& D);
-
 private:
     static constexpr double pi = 3.14159265358979323846;
 

@@ -374,59 +374,6 @@ double MolecularGrid::fk(unsigned int k, double mu) {
     return mu;
 }
 
-void MolecularGrid::output_density(const MatrixXXd& D) {
-    const double distx = 10.0;
-    const double disty = 10.0;
-    const double distz = 10.0;
-
-    const unsigned nrpoints = 100;
-
-    const double dx = distx / (double)(nrpoints - 1);
-    const double dy = disty / (double)(nrpoints - 1);
-    const double dz = distz / (double)(nrpoints - 1);
-
-    unsigned int counter = 0;
-
-    std::cout << "electron density" << std::endl;
-    std::cout << "    1.00000" << std::endl;
-    std::cout << distx << "    0    0" << std::endl;
-    std::cout << "0    " << disty << "    0" << std::endl;
-    std::cout << "0    0    " << distz << std::endl;
-    std::cout << "0" << std::endl;
-    std::cout << "Direct" << std::endl;
-    std::cout << std::endl;
-    std::cout << nrpoints << "  " << nrpoints << "  " << nrpoints << std::endl;
-
-    for(unsigned int k=0; k<nrpoints; k++) {
-        for(unsigned int l=0; l<nrpoints; l++) {
-            for(unsigned int m=0; m<nrpoints; m++) {
-                double x = m * dx - distx / 2.0;
-                double y = l * dy - disty / 2.0;
-                double z = k * dz - distz / 2.0;
-
-                double value = 0.0;
-                for(unsigned int i=0; i<this->mol->get_nr_bfs(); i++) {
-                    for(unsigned int j=0; j<this->mol->get_nr_bfs(); j++) {
-                        value = 2.0 * D(i,j) *
-                                this->mol->get_cgf(i).get_amp(vec3(x,y,z)) *
-                                this->mol->get_cgf(j).get_amp(vec3(x,y,z));
-                    }
-                }
-
-                std::cout << value << "\t";
-
-                if(counter == 6) {
-                    counter = 0;
-                    std::cout << std::endl;
-                    continue;
-                }
-
-                counter++;
-            }
-        }
-    }
-}
-
 void MolecularGrid::calculate_hartree_potential() {
     this->calculate_rho_lm();
     this->calculate_U_lm();
