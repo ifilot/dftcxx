@@ -129,6 +129,34 @@ VectorXd AtomicGrid::get_densities() const {
 }
 
 /**
+ * @fn get_positions
+ * @brief get the positions of all the grid points as a vector
+ *
+ * @return vector containing all the positions
+ */
+MatrixXXd AtomicGrid::get_positions() const {
+    MatrixXXd positions = MatrixXXd(this->grid.size(), 3);
+    for(unsigned int i=0; i<this->grid.size(); i++) {
+        for(unsigned int j=0; j<3; j++) {
+            positions(i,j) = this->grid[i].get_position()[j];
+        }
+    }
+
+    return positions;
+}
+
+/**
+ * @fn correct_weights
+ * @brief correct the weights
+ *
+ */
+void AtomicGrid::correct_weights(const VectorXd& corr) {
+    for(unsigned int i=0; i<corr.size(); i++) {
+        this->grid[i].multiply_weight(corr(i));
+    }
+}
+
+/**
  * @fn get_amplitudes
  * @brief get the amplitudes of all the grid points and all the basis functions as a matrix
  *

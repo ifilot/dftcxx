@@ -208,25 +208,31 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 
     for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
         // calculate the Becke weights for the atomic grids
-        // for(unsigned int g=grid_start; g<grid_stop; g++) {
+        
+        MatrixXXd positions = this->atomic_grids[i]->get_positions();
+        VectorXd becke_coeff = VectorXd::Zero(positions.size());
 
-        //     double denom = 0.0;
-        //     double nom = 1.0;
+        for(unsigned int j=0; j<positions.size(); j++) {
 
-        //     // loop over all atoms to get Pn(r)
-        //     for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
-        //         double term = this->get_becke_weight_pn(j, this->grid[g].get_position()); // obtain single Pn(r) term
-        //         denom += term;
-        //         if(i == j) {
-        //             nom = term;
-        //         }
-        //     }
+            double denom = 0.0;
+            double nom = 1.0;
 
-        //     // set weight from cell function: wn(r) = Pn(r) / SUM_m Pm(r) (eq. 22)
-        //     if(denom != 0.0) {
-        //         this->grid[g].multiply_weight(nom / denom);
-        //     }
-        // }
+            // loop over all atoms to get Pn(r)
+            for(unsigned int k=0; k<this->mol->get_nr_atoms(); k++) {
+                double term = this->get_becke_weight_pn(k, positions.row(j)); // obtain single Pn(r) term
+                denom += term;
+                if(i == k) {
+                    nom = term;
+                }
+            }
+
+            // set weight from cell function: wn(r) = Pn(r) / SUM_m Pm(r) (eq. 22)
+            if(denom != 0.0) {
+                becke_coeff(j) = nom / denom;
+            }
+        }
+
+        this->atomic_grids[i]->correct_weights(becke_coeff);
     }
 }
 

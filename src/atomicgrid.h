@@ -106,6 +106,21 @@ public:
     VectorXd get_densities() const;
 
     /**
+     * @fn get_positions
+     * @brief get the positions of all the grid points as a vector
+     *
+     * @return vector containing all the positions
+     */
+    MatrixXXd get_positions() const;
+
+    /**
+     * @fn correct_weights
+     * @brief correct the weights
+     *
+     */
+    void correct_weights(const VectorXd& corr);
+
+    /**
      * @fn get_amplitudes
      * @brief get the amplitudes of all the grid points and all the basis functions as a matrix
      *
