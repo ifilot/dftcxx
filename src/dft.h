@@ -149,7 +149,7 @@ private:
      *
      * @return void
      */
-    void calculate_transformation_matrix(bool sort = true);
+    void calculate_transformation_matrix();
 
     /*
      * functions for the SCF routine
@@ -167,7 +167,7 @@ private:
      *
      * @return void
      */
-    void calculate_density_matrix(bool sort = true);
+    void calculate_density_matrix();
 
     /**
      * @fn calculate_electronic_repulsion_matrix

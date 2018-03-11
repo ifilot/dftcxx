@@ -208,11 +208,11 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 
     for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
         // calculate the Becke weights for the atomic grids
-        
-        MatrixXXd positions = this->atomic_grids[i]->get_positions();
-        VectorXd becke_coeff = VectorXd::Zero(positions.size());
 
-        for(unsigned int j=0; j<positions.size(); j++) {
+        MatrixXXd positions = this->atomic_grids[i]->get_positions();
+        VectorXd becke_coeff = VectorXd::Zero(positions.rows());
+
+        for(unsigned int j=0; j<positions.rows(); j++) {
 
             double denom = 0.0;
             double nom = 1.0;
@@ -229,6 +229,8 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             // set weight from cell function: wn(r) = Pn(r) / SUM_m Pm(r) (eq. 22)
             if(denom != 0.0) {
                 becke_coeff(j) = nom / denom;
+            } else {
+                becke_coeff(j) = 1.0;
             }
         }
 
@@ -299,8 +301,14 @@ double MolecularGrid::fk(unsigned int k, double mu) {
 }
 
 void MolecularGrid::calculate_hartree_potential() {
+    MatrixXXd J = MatrixXXd::Zero(this->mol->get_nr_bfs(), this->mol->get_nr_bfs());
+
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         this->atomic_grids[i]->calculate_rho_lm();
         this->atomic_grids[i]->calculate_U_lm();
+
+        J += this->atomic_grids[i]->get_J();
     }
+
+    std::cout << J << std::endl;
 }

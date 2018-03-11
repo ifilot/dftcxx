@@ -29,10 +29,10 @@
  *
  * @return GridPoint instance
  */
-GridPoint::GridPoint(const vec3& _r):
-    r(_r) {
-
-}
+GridPoint::GridPoint(const vec3& _r, const vec3& _r_at):
+    r(_r),
+    r_at(_r_at)
+    {}
 
 /**
  * @fn set_basis_func_amp
@@ -43,7 +43,7 @@ GridPoint::GridPoint(const vec3& _r):
  * @return void
  */
 void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
-    unsigned int size = _mol->get_nr_bfs();
+    const unsigned int size = _mol->get_nr_bfs();
     this->basis_func_amp = VectorXd(size);
 
     for(unsigned int i=0; i<size; i++) {

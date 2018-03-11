@@ -61,9 +61,10 @@ void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
         for(unsigned int a=lebedev_offset; a<angular_points + lebedev_offset; a++) {
             // create a new grid point given the coordinates on the unit sphere; these
             // coordinates are multiplied by the radius as calculated above
-            this->grid.push_back(GridPoint(p1 + vec3(Quadrature::lebedev_coefficients[a][0],
-                                                     Quadrature::lebedev_coefficients[a][1],
-                                                     Quadrature::lebedev_coefficients[a][2]) * r));
+            const vec3 p2 = vec3(Quadrature::lebedev_coefficients[a][0],
+                                 Quadrature::lebedev_coefficients[a][1],
+                                 Quadrature::lebedev_coefficients[a][2]) * r;
+            this->grid.push_back(GridPoint(p1 + p2, p2));
 
             // set the total integration weight by multiplying the Gauss-Chebyshev weight by the Lebedev weight
             // note that the 'weight' from the Jacobian due to spherical coordinates and the weight
@@ -77,7 +78,7 @@ void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
 
     // correct the weights for the Jacobian r**2 and the 4PI from the Lebedev quadrature
     for(unsigned int i=0; i<grid.size(); i++) {
-        this->grid[i].multiply_weight((this->grid[i].get_position() - p1).squaredNorm() * 4.0 * pi);
+        this->grid[i].multiply_weight((this->grid[i].get_position_fuzzy_cell()).squaredNorm() * 4.0 * pi);
     }
 }
 
@@ -228,7 +229,7 @@ void AtomicGrid::calculate_rho_lm() {
         n = 0;
 
         // calculate radial distance for each radial grid point
-        this->r_n(i) = this->grid[i * this->angular_points].get_position().norm();
+        this->r_n(i) = this->grid[i * this->angular_points].get_position_fuzzy_cell().norm();
 
         // calculate total radial density
         for(unsigned int j=0; j<this->angular_points; j++) {
@@ -245,15 +246,15 @@ void AtomicGrid::calculate_rho_lm() {
                     unsigned int idx = i * angular_points + j;
 
                     // get cartesian coordinates
-                    vec3 pos = this->grid[idx].get_position();
+                    const vec3& pos = this->grid[idx].get_position_fuzzy_cell();
                     const double w = Quadrature::lebedev_coefficients[j + lebedev_offset][3];
 
                     // convert to spherical coordinates
-                    double r = pos.norm(); // due to unit sphere
-                    double azimuth = std::atan2(pos(1),pos(0));
-                    double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
+                    const double r = pos.norm(); // due to unit sphere
+                    const double azimuth = std::atan2(pos(1),pos(0));
+                    const double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
 
-                    double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
+                    const double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
 
                     this->rho_lm(i, n) += densities(idx) * y_lm * w;
                 }
@@ -266,28 +267,24 @@ void AtomicGrid::calculate_rho_lm() {
 }
 
 void AtomicGrid::calculate_U_lm() {
-    unsigned int N = this->grid.size() / this->angular_points;
+    const size_t N = this->grid.size() / this->angular_points;
 
     static const double sqrt4pi = std::sqrt(4.0 * M_PI);
-
-    std::vector<double> atomic_density;
-    atomic_density.resize(this->mol->get_nr_atoms(), 0.0);
 
     VectorXd weights = this->get_weights();
     VectorXd densities = this->get_densities();
 
     // calculate total electron density per atom
-    for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
-        for(unsigned int j=0; j<this->radial_points; j++) {
-            for(unsigned int k=0; k<this->angular_points; k++) {
-                unsigned int idx = j * angular_points + k;
-                atomic_density[i] += weights(idx) * densities(idx);
-            }
+    double atomic_density = 0.0;
+    for(unsigned int j=0; j<this->radial_points; j++) {
+        for(unsigned int k=0; k<this->angular_points; k++) {
+            unsigned int idx = j * angular_points + k;
+            atomic_density += weights(idx) * densities(idx);
         }
-        std::cout << "Atomic density on " << i+1 << ": " << atomic_density[i] << std::endl;
     }
+    std::cout << "Atomic density: " << atomic_density << std::endl;
 
-    double q_n = atomic_density[0];
+    const double q_n = this->atom->get_charge();
 
     double c1 = 0.0;    // constant for d2U/dz2
     double c2 = 0.0;    // constant for (dU/dz)^2
@@ -428,14 +425,14 @@ void AtomicGrid::calculate_U_lm() {
                     unsigned int idx = i * angular_points + j;
 
                     // get cartesian coordinates
-                    vec3 pos = this->grid[idx].get_position();
+                    vec3 pos = this->grid[idx].get_position_fuzzy_cell();
 
                     // convert to spherical coordinates
-                    double r = pos.norm(); // due to unit sphere
-                    double azimuth = std::atan2(pos(1),pos(0));
-                    double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
+                    const double r = pos.norm(); // due to unit sphere
+                    const double azimuth = std::atan2(pos(1),pos(0));
+                    const double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
 
-                    double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
+                    const double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
                     V(idx) += 1.0 / r * y_lm * U_lm(i,n);
                 }
                 n++;
@@ -443,21 +440,21 @@ void AtomicGrid::calculate_U_lm() {
         }
     }
 
-    MatrixXXd amplitudes  = this->get_amplitudes();
+    MatrixXXd amplitudes  = this->get_amplitudes();     // get NxM amplitude matrix where N are the number of BF and M the gridpoints
     VectorXd Vp = weights.cwiseProduct(V);
-    VectorXd row = amplitudes.row(0);
+    VectorXd row;
     const unsigned int size = this->mol->get_nr_bfs();
-    MatrixXXd Jj = MatrixXXd::Zero(size, size);
+    this->Jj = MatrixXXd::Zero(size, size);
 
     for(unsigned int i=0; i<size; i++) {
         VectorXd row = amplitudes.row(i);
         VectorXd row_i = Vp.cwiseProduct(row);
         for(unsigned int j=i; j<size; j++) {
-            Jj(i,j) = Jj(j,i) = row_i.dot(amplitudes.row(j)) / 2.0;
+            this->Jj(i,j) = this->Jj(j,i) = row_i.dot(amplitudes.row(j)) * 0.5;
         }
     }
 
-    std::cout << "Numerical approximation of Jj: " << Jj << std::endl;
+    // std::cout << "Numerical approximation of Jj:" << std::endl << this->Jj << std::endl;
 }
 
 double AtomicGrid::spherical_harmonic(int l, int m, double pole, double azimuth) const {

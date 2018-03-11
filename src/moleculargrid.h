@@ -69,7 +69,7 @@ private:
     // vector holding radial distances
     VectorXd r_n;
 
-    size_t grid_size;
+    size_t grid_size;       //!< total grid size
 
 public:
     /**

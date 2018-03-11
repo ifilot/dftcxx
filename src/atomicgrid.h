@@ -52,6 +52,8 @@ private:
     unsigned int lebedev_offset;
     unsigned int lmax;
 
+    MatrixXXd Jj;                                   // numerical J matrix for this atom
+
 public:
     AtomicGrid(const std::shared_ptr<Atom>& _atom);
 
@@ -127,6 +129,15 @@ public:
      * @return matrix (basis functions x grid points)
      */
     MatrixXXd get_amplitudes() const;
+
+    /**
+     * @brief      get coulomb matrix
+     *
+     * @return     Coulomb matrix
+     */
+    inline const MatrixXXd& get_J() const {
+        return this->Jj;
+    }
 
     void calculate_rho_lm();
     void calculate_U_lm();

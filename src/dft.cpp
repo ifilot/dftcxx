@@ -118,7 +118,8 @@ void DFT::scf() {
     std::cout << "Stopping because energy criterion is reached." << std::endl;
     std::cout << std::endl;
 
-    std::cout << "Coulomb repulsion: " << this->J << std::endl;
+    std::cout << "Exact coulomb repulsion:" << std::endl << this->J << std::endl;
+    std::cout << "Calculating Hartree Potential" << std::endl;
     this->molgrid->calculate_hartree_potential();
 }
 
@@ -272,7 +273,7 @@ void DFT::calculate_two_electron_integrals() {
  *
  * @return void
  */
-void DFT::calculate_transformation_matrix(bool sort) {
+void DFT::calculate_transformation_matrix() {
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(S);
@@ -302,8 +303,8 @@ void DFT::calculate_transformation_matrix(bool sort) {
  *
  * @return void
  */
-void DFT::calculate_density_matrix(bool sort) {
-    static const double alpha = 0.50; // mixing parameter alpha (NOTE: obtain this value from input file...)
+void DFT::calculate_density_matrix() {
+    static const double alpha = 0.70; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     MatrixXXd F = this->H + 2.0 * this->J + this->XC;
@@ -312,7 +313,6 @@ void DFT::calculate_density_matrix(bool sort) {
 
     // compute eigenvectors and eigenvalues
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(Fp);
-    // Eigen::MatrixXd D = es.eigenvalues().real().asDiagonal();
     this->Cc = es.eigenvectors().real();
 
     // obtain true coefficient matrix using the transformation matrix

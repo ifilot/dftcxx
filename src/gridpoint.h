@@ -52,12 +52,12 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
 class GridPoint {
 public:
     /**
-     * @fn DFT
-     * @brief DFT routine constructor
+     * @brief      construct grid point
      *
-     * @return DFT instance
+     * @param[in]  _r     position in complete space
+     * @param[in]  _r_at  position in fuzzy cell
      */
-    GridPoint(const vec3& _r);
+    GridPoint(const vec3& _r, const vec3& _r_at);
 
     /*
      * SETTERS
@@ -134,6 +134,16 @@ public:
     }
 
     /**
+     * @fn get_position_fuzzy_cell
+     * @brief get the position of the grid point relative to fuzzy cell
+     *
+     * @return vec3 position of the grid point relative to fuzzy cell
+     */
+    inline const vec3& get_position_fuzzy_cell() const {
+        return this->r_at;
+    }
+
+    /**
      * @fn get_atom_position
      * @brief get the position of the atom to which this grid point is 'linked'
      *
@@ -175,6 +185,7 @@ public:
 
 private:
     const vec3 r;               // position in 3D space
+    const vec3 r_at;            // get position relative to atom the gridpoint adheres to
     double w;                   // weight
     const Atom* atom;           // atom this gridpoint adheres to
     VectorXd basis_func_amp;    // amplitude of basis functions at gridpoint
