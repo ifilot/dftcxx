@@ -25,6 +25,7 @@
 #include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 #include <string>
 #include <bitset>
 #include <fstream>

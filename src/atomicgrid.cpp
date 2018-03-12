@@ -152,6 +152,10 @@ MatrixXXd AtomicGrid::get_positions() const {
  *
  */
 void AtomicGrid::correct_weights(const VectorXd& corr) {
+    if(corr.size() != this->grid.size()) {
+        throw std::runtime_error("Dimension of correction vector does not match dimension of grid");
+    }
+
     for(unsigned int i=0; i<corr.size(); i++) {
         this->grid[i].multiply_weight(corr(i));
     }
@@ -282,7 +286,6 @@ void AtomicGrid::calculate_U_lm() {
             atomic_density += weights(idx) * densities(idx);
         }
     }
-    std::cout << "Atomic density: " << atomic_density << std::endl;
 
     const double q_n = this->atom->get_charge();
 

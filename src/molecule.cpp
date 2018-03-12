@@ -87,6 +87,16 @@ void Molecule::read_molecule_from_file(const std::string& filename) {
 
     this->set_basis_set(basis_set);
     std::cout << "========================================" << std::endl;
+
+    for(unsigned int i=0; i<nratoms; i++) {
+        std::cout << boost::format("%i  %12.6f  %12.6f  %12.6f")
+                     % this->atoms[i]->get_charge()
+                     % this->atoms[i]->get_position()[0]
+                     % this->atoms[i]->get_position()[1]
+                     % this->atoms[i]->get_position()[2] << std::endl;
+    }
+
+    std::cout << "========================================" << std::endl;
     std::cout << std::endl;
 }
 

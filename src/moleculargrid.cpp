@@ -32,7 +32,7 @@
 MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
     this->grid_size = 0;
-    this->create_grid(GRID_ULTRAFINE);
+    this->create_grid(GRID_COARSE);
 }
 
 /**
@@ -206,8 +206,8 @@ void MolecularGrid::create_grid(unsigned int fineness) {
         this->grid_size += this->atomic_grids.back()->get_grid_size();
     }
 
+    // calculate the Becke weights for the atomic grids
     for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
-        // calculate the Becke weights for the atomic grids
 
         MatrixXXd positions = this->atomic_grids[i]->get_positions();
         VectorXd becke_coeff = VectorXd::Zero(positions.rows());
@@ -252,6 +252,8 @@ void MolecularGrid::create_grid(unsigned int fineness) {
  */
 double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
     double wprod = 1.0;
+
+    // get position of central atom in fuzzy cell
     const vec3 p1 = this->mol->get_atom(atnr)->get_position();
 
     for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
@@ -259,12 +261,15 @@ double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
             continue;
         }
 
+        // get position of other atom
         const vec3 p2 = this->mol->get_atom(j)->get_position();
 
+        // calculate mu (eq. 11 in A.D. Becke J.Chem.Phys. 88, 2547)
         double mu =  ((p0 - p1).norm()
                     - (p0 - p2).norm() )/
                       (p2-p1).norm();
 
+        // (eq. 13 in A.D. Becke J.Chem.Phys. 88, 2547)
         wprod *= this->cutoff(mu);
     }
 
@@ -304,6 +309,8 @@ void MolecularGrid::calculate_hartree_potential() {
     MatrixXXd J = MatrixXXd::Zero(this->mol->get_nr_bfs(), this->mol->get_nr_bfs());
 
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+        std::cout << "Atomic density on " << (i+1) << ": " << this->atomic_grids[i]->calculate_density() << std::endl;
+
         this->atomic_grids[i]->calculate_rho_lm();
         this->atomic_grids[i]->calculate_U_lm();
 
