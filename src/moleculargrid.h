@@ -175,7 +175,7 @@ private:
      *
      * @return double Becke weight value
      */
-    double get_becke_weight_pn(unsigned int atnr, const vec3& p0);
+    double get_becke_weight_pn(unsigned int i, const vec3& p0);
 
     /*
      * auxiliary functions for the Becke grid

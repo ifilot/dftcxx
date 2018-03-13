@@ -210,8 +210,9 @@ void MolecularGrid::create_grid(unsigned int fineness) {
     for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
 
         MatrixXXd positions = this->atomic_grids[i]->get_positions();
-        VectorXd becke_coeff = VectorXd::Zero(positions.rows());
+        VectorXd becke_weight_coeff = VectorXd::Zero(positions.rows());
 
+        // loop over positions
         for(unsigned int j=0; j<positions.rows(); j++) {
 
             double denom = 0.0;
@@ -219,7 +220,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
 
             // loop over all atoms to get Pn(r)
             for(unsigned int k=0; k<this->mol->get_nr_atoms(); k++) {
-                double term = this->get_becke_weight_pn(k, positions.row(j)); // obtain single Pn(r) term
+                const double term = this->get_becke_weight_pn(k, positions.row(j)); // obtain single Pn(r) term
                 denom += term;
                 if(i == k) {
                     nom = term;
@@ -227,37 +228,34 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             }
 
             // set weight from cell function: wn(r) = Pn(r) / SUM_m Pm(r) (eq. 22)
-            if(denom != 0.0) {
-                becke_coeff(j) = nom / denom;
-            } else {
-                becke_coeff(j) = 1.0;
-            }
+            becke_weight_coeff(j) = nom / denom;
         }
 
-        this->atomic_grids[i]->correct_weights(becke_coeff);
+        this->atomic_grids[i]->correct_weights(becke_weight_coeff);
     }
 }
 
 /**
  * @fn get_becke_weight_pn
- * @brief calculate Pn(r) (i.e. for a single gridpoint) for atom n (eq. 22 in A.D. Becke J.Chem.Phys. 88, 2547)
+ * @brief calculate Pi(r) (i.e. for a single gridpoint) for atom n (eq. 13 in A.D. Becke J.Chem.Phys. 88, 2547)
  *
  * Reference: A.D. Becke, J.Chem.Phys. 88, 2547, (1988)
  * Link: http://dx.doi.org/10.1063/1.454033
  *
- * @param atnr atomic number
+ * @param i    atom id i
  * @param p0   grid point position
  *
  * @return double Becke weight value
  */
-double MolecularGrid::get_becke_weight_pn(unsigned int atnr, const vec3& p0) {
+double MolecularGrid::get_becke_weight_pn(unsigned int i, const vec3& p0) {
     double wprod = 1.0;
 
     // get position of central atom in fuzzy cell
-    const vec3 p1 = this->mol->get_atom(atnr)->get_position();
+    const vec3 p1 = this->mol->get_atom(i)->get_position();
 
+    // loop over all other atoms
     for(unsigned int j=0; j<this->mol->get_nr_atoms(); j++) {
-        if(atnr == j) {
+        if(i == j) {
             continue;
         }
 

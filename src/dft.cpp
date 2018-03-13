@@ -180,8 +180,10 @@ void DFT::construct_matrices() {
             V(i,j) = V(j,i) = v_sum;
         }
     }
+
     // calculate single-electron matrix by summing T and V matrices
     this->H = this->T + this->V;
+
     // calculate nuclear repulsion energy
     this->calculate_nuclear_repulsion();
 
@@ -334,8 +336,8 @@ void DFT::calculate_density_matrix() {
         this->P = (1.0 - alpha) * Pnew + alpha * P;
     }
 
+    // set the new density
     this->molgrid->set_density(P);
-    //this->molgrid->renormalize_density(this->nelec);
 }
 
 /**
@@ -421,6 +423,9 @@ void DFT::calculate_exchange_correlation_matrix() {
             this->XC(i,j) = this->XC(j,i) = wva_i.dot(amplitudes.row(j));
         }
     }
+
+    std::cout << this->P << std::endl;
+    std::cout << this->XC << std::endl;
 }
 
 /**
