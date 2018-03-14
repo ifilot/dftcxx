@@ -130,7 +130,7 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
 double MolecularGrid::calculate_density() const {
     double sum = 0.0;
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
-        sum += this->atomic_grids[i]->calculate_density();
+        sum += this->atomic_grids[i]->get_density();
     }
 
     return sum;
@@ -307,7 +307,7 @@ void MolecularGrid::calculate_hartree_potential() {
     MatrixXXd J = MatrixXXd::Zero(this->mol->get_nr_bfs(), this->mol->get_nr_bfs());
 
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
-        std::cout << "Atomic density on " << (i+1) << ": " << this->atomic_grids[i]->calculate_density() << std::endl;
+        std::cout << "Atomic density on " << (i+1) << ": " << this->atomic_grids[i]->get_density() << std::endl;
 
         this->atomic_grids[i]->calculate_rho_lm();
         this->atomic_grids[i]->calculate_U_lm();

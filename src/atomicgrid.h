@@ -53,6 +53,8 @@ private:
     unsigned int lmax;
 
     MatrixXXd Jj;                                   // numerical J matrix for this atom
+    double density;                                 // total electron density for this fuzzy cell
+    bool density_cached;                            // whether density has been evaluated
 
 public:
     AtomicGrid(const std::shared_ptr<Atom>& _atom);
@@ -68,15 +70,12 @@ public:
     }
 
     /**
-     * @fn calculate_density
-     * @brief calculate the total electron density (number of electrons)
+     * @fn get_density
+     * @brief get the total electron density
      *
-     * Calculates the total number of electrons by summing the weights
-     * multiplied by the local value of the electron density.
-     *
-     * @return number of electrons
+     * @return total electron density
      */
-    double calculate_density() const;
+    double get_density();
 
     /**
      * @fn set_density
@@ -152,6 +151,17 @@ private:
 
     double d2zdr2(double r, double m);
     double dzdrsq(double r, double m);
+
+    /**
+     * @fn calculate_density
+     * @brief calculate the total electron density (number of electrons)
+     *
+     * Calculates the total number of electrons by summing the weights
+     * multiplied by the local value of the electron density.
+     *
+     * @return number of electrons
+     */
+    void calculate_density();
 };
 
 #endif //_ATOMIC_GRID_H

@@ -37,6 +37,7 @@ void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
     this->lebedev_offset = _lebedev_offset;
     this->lmax = _lmax;
     this->mol = _mol;
+    this->density_cached = false;
 
     // construct grid points
     const vec3 p1 = this->atom->get_position();
@@ -97,6 +98,21 @@ void AtomicGrid::set_density(const MatrixXXd& P) {
     for(unsigned int i=0; i<this->grid.size(); i++) {
         this->grid[i].set_density(P);
     }
+    this->density_cached = false;
+}
+
+/**
+ * @fn get_density
+ * @brief get the total electron density
+ *
+ * @return total electron density
+ */
+double AtomicGrid::get_density() {
+    if(!this->density_cached) {
+        this->calculate_density();
+    }
+
+    return this->density;
 }
 
 /**
@@ -180,23 +196,7 @@ MatrixXXd AtomicGrid::get_amplitudes() const {
     return amplitudes;
 }
 
-/**
- * @fn calculate_density
- * @brief calculate the total electron density (number of electrons)
- *
- * Calculates the total number of electrons by summing the weights
- * multiplied by the local value of the electron density.
- *
- * @return number of electrons
- */
-double AtomicGrid::calculate_density() const {
-    double sum = 0.0;
-    for(unsigned int i=0; i<this->grid.size(); i++) {
-        sum += this->grid[i].get_weight() * this->grid[i].get_density();
-    }
 
-    return sum;
-}
 
 /**
  * @fn calculate_rho_lm
@@ -287,7 +287,7 @@ void AtomicGrid::calculate_U_lm() {
         }
     }
 
-    const double q_n = this->atom->get_charge();
+    const double q_n = this->get_density();
 
     double c1 = 0.0;    // constant for d2U/dz2
     double c2 = 0.0;    // constant for (dU/dz)^2
@@ -568,4 +568,21 @@ double AtomicGrid::d2zdr2(double r, double m) {
 
 double AtomicGrid::dzdrsq(double r, double m) {
     return m / (M_PI * M_PI * r * (m + r)*(m + r));
+}
+
+/**
+ * @fn calculate_density
+ * @brief calculate the total electron density (number of electrons)
+ *
+ * Calculates the total number of electrons by summing the weights
+ * multiplied by the local value of the electron density.
+ *
+ */
+void AtomicGrid::calculate_density() {
+    this->density = 0.0;
+    for(unsigned int i=0; i<this->grid.size(); i++) {
+        this->density += this->grid[i].get_weight() * this->grid[i].get_density();
+    }
+
+    this->density_cached = true;
 }
