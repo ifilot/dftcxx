@@ -235,6 +235,15 @@ unsigned int Molecule::get_atom_number_from_string(std::string el) {
     if(el.compare("O") == 0) {
         return 8;
     }
+    if(el.compare("F") == 0) {
+        return 9;
+    }
+    if(el.compare("Ne") == 0) {
+        return 10;
+    }
+    if(el.compare("Ar") == 0) {
+        return 18;
+    }
 
     return 0;
 }

@@ -57,14 +57,34 @@ private:
     bool density_cached;                            // whether density has been evaluated
 
 public:
+
+    /**
+     * @brief      create atomic grid
+     *
+     * @param[in]  _atom  pointer to atom
+     */
     AtomicGrid(const std::shared_ptr<Atom>& _atom);
 
+    /**
+     * @brief      Creates an atomic grid.
+     *
+     * @param[in]  _radial_points   number of radial points
+     * @param[in]  _angular_points  number of angular points
+     * @param[in]  _lebedev_offset  lebedev offset
+     * @param[in]  _lmax            maximum angular quantum number l
+     * @param[in]  _mol             pointer to molecule
+     */
     void create_atomic_grid(unsigned int _radial_points,
                             unsigned int _angular_points,
                             unsigned int _lebedev_offset,
                             unsigned int _lmax,
                             const std::shared_ptr<Molecule>& _mol);
 
+    /**
+     * @brief      Gets the grid size.
+     *
+     * @return     The grid size.
+     */
     inline size_t get_grid_size() const {
         return this->grid.size();
     }
@@ -115,11 +135,11 @@ public:
     MatrixXXd get_positions() const;
 
     /**
-     * @fn correct_weights
-     * @brief correct the weights
+     * @brief      set fuzzy cell weights
      *
+     * @param[in]  vw  fuzzy cell weights
      */
-    void correct_weights(const VectorXd& corr);
+    void set_becke_weights(const VectorXd& vw);
 
     /**
      * @fn get_amplitudes
@@ -138,18 +158,31 @@ public:
         return this->Jj;
     }
 
+    /**
+     * @brief      calculate density at distance r
+     */
     void calculate_rho_lm();
+
+    /**
+     * @brief      calculate spherical harmonics
+     */
     void calculate_U_lm();
 
 private:
     double spherical_harmonic(int l, int m, double pole, double azimuth) const;
+
     double prefactor_spherical_harmonic(int l, int m) const;
+
     double polar_function(int l, int m, double theta) const;
+
     double azimuthal_function(int m, double phi) const;
+
     double legendre (int n, double x) const;
+
     double legendre_p (int n, int m, double x) const;
 
     double d2zdr2(double r, double m);
+
     double dzdrsq(double r, double m);
 
     /**

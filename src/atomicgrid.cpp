@@ -163,17 +163,18 @@ MatrixXXd AtomicGrid::get_positions() const {
 }
 
 /**
- * @fn correct_weights
- * @brief correct the weights
+ * @brief      set fuzzy cell weights
  *
+ * @param[in]  vw  fuzzy cell weights
  */
-void AtomicGrid::correct_weights(const VectorXd& corr) {
-    if(corr.size() != this->grid.size()) {
+void AtomicGrid::set_becke_weights(const VectorXd& vw) {
+    if(vw.size() != this->grid.size()) {
         throw std::runtime_error("Dimension of correction vector does not match dimension of grid");
     }
 
-    for(unsigned int i=0; i<corr.size(); i++) {
-        this->grid[i].multiply_weight(corr(i));
+    for(unsigned int i=0; i<vw.size(); i++) {
+        this->grid[i].multiply_weight(vw(i));
+        this->grid[i].set_becke_weight(vw(i));
     }
 }
 
@@ -244,7 +245,7 @@ void AtomicGrid::calculate_rho_lm() {
         // calculate rho_lm from the radial density and the spherical harmonics
         for(int l=0; l<=lmax; l++) {
             for(int m=-l; m<=l; m++) {
-                double pre = this->prefactor_spherical_harmonic(l, m);
+                const double pre = this->prefactor_spherical_harmonic(l, m);
                 for(unsigned int j=0; j<this->angular_points; j++) {
                     // get index positions
                     unsigned int idx = i * angular_points + j;
@@ -252,6 +253,7 @@ void AtomicGrid::calculate_rho_lm() {
                     // get cartesian coordinates
                     const vec3& pos = this->grid[idx].get_position_fuzzy_cell();
                     const double w = Quadrature::lebedev_coefficients[j + lebedev_offset][3];
+                    const double wb = this->grid[idx].get_becke_weight();
 
                     // convert to spherical coordinates
                     const double r = pos.norm(); // due to unit sphere
@@ -262,7 +264,7 @@ void AtomicGrid::calculate_rho_lm() {
 
                     this->rho_lm(i, n) += densities(idx) * y_lm * w;
                 }
-                this->rho_lm(i, n) *= 4.0 * M_PI;
+                this->rho_lm(i, n) *= 4.0 * M_PI;   // correct for unit sphere
 
                 n++;
             }
@@ -274,19 +276,7 @@ void AtomicGrid::calculate_U_lm() {
     const size_t N = this->grid.size() / this->angular_points;
 
     static const double sqrt4pi = std::sqrt(4.0 * M_PI);
-
     VectorXd weights = this->get_weights();
-    VectorXd densities = this->get_densities();
-
-    // calculate total electron density per atom
-    double atomic_density = 0.0;
-    for(unsigned int j=0; j<this->radial_points; j++) {
-        for(unsigned int k=0; k<this->angular_points; k++) {
-            unsigned int idx = j * angular_points + k;
-            atomic_density += weights(idx) * densities(idx);
-        }
-    }
-
     const double q_n = this->get_density();
 
     double c1 = 0.0;    // constant for d2U/dz2
@@ -443,9 +433,8 @@ void AtomicGrid::calculate_U_lm() {
         }
     }
 
-    MatrixXXd amplitudes  = this->get_amplitudes();     // get NxM amplitude matrix where N are the number of BF and M the gridpoints
+    MatrixXXd amplitudes = this->get_amplitudes();     // get NxM amplitude matrix where N are the number of BF and M the gridpoints
     VectorXd Vp = weights.cwiseProduct(V);
-    VectorXd row;
     const unsigned int size = this->mol->get_nr_bfs();
     this->Jj = MatrixXXd::Zero(size, size);
 

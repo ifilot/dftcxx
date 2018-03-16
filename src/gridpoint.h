@@ -50,6 +50,17 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
  *
  */
 class GridPoint {
+private:
+    const vec3 r;               // position in 3D space
+    const vec3 r_at;            // get position relative to atom the gridpoint adheres to
+
+    double w;                   // weight
+    double w_becke;             // Fuzzy cell weight
+    double density;             // current density at grid point
+
+    const Atom* atom;           // atom this gridpoint adheres to
+    VectorXd basis_func_amp;    // amplitude of basis functions at gridpoint
+
 public:
     /**
      * @brief      construct grid point
@@ -63,7 +74,7 @@ public:
      * SETTERS
      */
 
-     /**
+    /**
      * @fn set_weight
      * @brief set the weight at the grid point
      *
@@ -73,6 +84,24 @@ public:
      */
     inline void set_weight(double _w) {
         this->w = _w;
+    }
+
+    /**
+     * @brief      Sets the becke weight.
+     *
+     * @param[in]  bw    becke weight
+     */
+    inline void set_becke_weight(double bw) {
+        this->w_becke = bw;
+    }
+
+    /**
+     * @brief      Gets the becke weight.
+     *
+     * @return     The becke weight.
+     */
+    inline double get_becke_weight() const {
+        return this->w_becke;
     }
 
     /**
@@ -182,14 +211,6 @@ public:
     inline const VectorXd& get_basis_func_amp() const {
         return this->basis_func_amp;
     }
-
-private:
-    const vec3 r;               // position in 3D space
-    const vec3 r_at;            // get position relative to atom the gridpoint adheres to
-    double w;                   // weight
-    const Atom* atom;           // atom this gridpoint adheres to
-    VectorXd basis_func_amp;    // amplitude of basis functions at gridpoint
-    double density;             // current density at grid point
 };
 
 #endif // _GRIDPOINT_H

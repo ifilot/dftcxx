@@ -231,7 +231,7 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             becke_weight_coeff(j) = nom / denom;
         }
 
-        this->atomic_grids[i]->correct_weights(becke_weight_coeff);
+        this->atomic_grids[i]->set_becke_weights(becke_weight_coeff);
     }
 }
 
