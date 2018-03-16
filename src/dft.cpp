@@ -419,13 +419,10 @@ void DFT::calculate_exchange_correlation_matrix() {
     for(unsigned int i=0; i<this->cgfs->size(); i++) {
         VectorXd row = amplitudes.row(i);
         VectorXd wva_i = wva.cwiseProduct(row);
-        for(unsigned int j=i; j<this->cgfs->size(); j++) {
-            this->XC(i,j) = this->XC(j,i) = wva_i.dot(amplitudes.row(j));
+        for(unsigned int j=0; j<this->cgfs->size(); j++) {
+            this->XC(i,j) = wva_i.dot(amplitudes.row(j));
         }
     }
-
-    std::cout << this->P << std::endl;
-    std::cout << this->XC << std::endl;
 }
 
 /**

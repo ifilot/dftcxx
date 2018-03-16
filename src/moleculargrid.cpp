@@ -32,7 +32,7 @@
 MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
     this->grid_size = 0;
-    this->create_grid(GRID_COARSE);
+    this->create_grid(GRID_ULTRAFINE);
 }
 
 /**
@@ -109,7 +109,7 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
 
         for(unsigned int j = 0; j<this->atomic_grids[i]->get_grid_size(); j++) {
             for(unsigned int k=0; k<this->mol->get_nr_bfs(); k++) {
-                amplitudes(k,j) = agrid_amplitudes(k,j);
+                amplitudes(k,idx) = agrid_amplitudes(k,j);
             }
             idx++;
         }
