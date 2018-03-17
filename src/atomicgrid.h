@@ -25,6 +25,8 @@
 #include "gridpoint.h"
 #include "quadrature.h"
 #include "molecule.h"
+#include "cspline.h"
+#include "spherical_harmonics.h"
 
 class AtomicGrid {
 private:
@@ -41,11 +43,18 @@ private:
 
     // hartree potential coefficient (MXN) matrix where M are the radial points and N the combined lm index
     MatrixXXd U_lm;
+    unsigned int lm;
+
+    // hartree potential
+    VectorXd V_fuzzy_cell;
+    VectorXd V;
 
     // vector holding radial distances
     VectorXd r_n;
 
     std::vector<GridPoint> grid;                    // set of all gridpoints
+
+    std::vector<Cspline> splines;
 
     unsigned int angular_points;
     unsigned int radial_points;
@@ -87,6 +96,26 @@ public:
      */
     inline size_t get_grid_size() const {
         return this->grid.size();
+    }
+
+    /**
+     * @brief      get the center position of the fuzzy cell
+     *
+     * @return     fuzzy cell center position
+     */
+    inline const vec3& get_position() const {
+        return this->atom->get_position();
+    }
+
+    /**
+     * @brief      get the position of the grid point
+     *
+     * @param[in]  idx   index of grid point
+     *
+     * @return     grid point position
+     */
+    inline const vec3& get_position_grid_point(unsigned int idx) const {
+        return this->grid[idx].get_position();
     }
 
     /**
@@ -164,23 +193,47 @@ public:
     void calculate_rho_lm();
 
     /**
-     * @brief      calculate spherical harmonics
+     * @brief      calculate spherical harmonic coefficients
      */
     void calculate_U_lm();
 
+    /**
+     * @brief      Calculates the j matrix.
+     */
+    void calculate_J_matrix();
+
+    /**
+     * @brief      Gets the sh value.
+     *
+     * @param[in]  r     radial distance from fuzzy cell center
+     * @param[in]  lm    lm index
+     *
+     * @return     The sh value.
+     */
+    double get_sh_value(double r, unsigned int lm) const;
+
+    /**
+     * @brief      get the local hartree potential for this fuzzy cell
+     *
+     * @param[in]  idx   grid point index
+     *
+     * @return     local cell hartree potential Vn
+     */
+    inline double get_V(unsigned int idx) const {
+        return this->V_fuzzy_cell(idx);
+    }
+
+    /**
+     * @brief      Set total Hartree potential for gridpoint
+     *
+     * @param[in]  idx   grid point index
+     * @param[in]  v     total hartree potential
+     */
+    inline void set_V_gp(unsigned int idx, double v) {
+        this->V(idx) = v;
+    }
+
 private:
-    double spherical_harmonic(int l, int m, double pole, double azimuth) const;
-
-    double prefactor_spherical_harmonic(int l, int m) const;
-
-    double polar_function(int l, int m, double theta) const;
-
-    double azimuthal_function(int m, double phi) const;
-
-    double legendre (int n, double x) const;
-
-    double legendre_p (int n, int m, double x) const;
-
     double d2zdr2(double r, double m);
 
     double dzdrsq(double r, double m);
@@ -195,6 +248,11 @@ private:
      * @return number of electrons
      */
     void calculate_density();
+
+    /**
+     * @brief      perform interpolation on the spherical harmonic coefficients
+     */
+    void interpolate_sh_coeff();
 };
 
 #endif //_ATOMIC_GRID_H

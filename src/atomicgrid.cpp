@@ -42,6 +42,7 @@ void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
     // construct grid points
     const vec3 p1 = this->atom->get_position();
     const double f = pi / (double)(radial_points + 1);
+    this->r_n = VectorXd::Zero(this->radial_points);
 
     // loop over all the radial points
     for(unsigned int p=1; p<=radial_points; p++) {
@@ -53,6 +54,7 @@ void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
 
         // convert x to r so that the interval is converted from [-1,1] to [0, infinity]
         const double r = (1.0 + x) / (1.0 - x);
+        this->r_n(p-1) = r;
 
         // calculate weight function of the Gauss-Chebyshev integration
         w =  w / std::sqrt(1.0 - std::pow(x, 2.0)) *
@@ -223,18 +225,12 @@ void AtomicGrid::calculate_rho_lm() {
     // create vector holding the radial electron density
     VectorXd rho_r = VectorXd::Zero(this->grid.size() / this->angular_points);
 
-    // create vector holding r values (i.e. distance to atomic center)
-    this->r_n = VectorXd(this->grid.size() / this->angular_points);
-
     VectorXd weights = this->get_weights();
     VectorXd densities = this->get_densities();
     VectorXd rho_n = weights.cwiseProduct(densities);
 
     for(unsigned int i=0; i<this->grid.size() / this->angular_points; i++) {
         n = 0;
-
-        // calculate radial distance for each radial grid point
-        this->r_n(i) = this->grid[i * this->angular_points].get_position_fuzzy_cell().norm();
 
         // calculate total radial density
         for(unsigned int j=0; j<this->angular_points; j++) {
@@ -245,7 +241,7 @@ void AtomicGrid::calculate_rho_lm() {
         // calculate rho_lm from the radial density and the spherical harmonics
         for(int l=0; l<=lmax; l++) {
             for(int m=-l; m<=l; m++) {
-                const double pre = this->prefactor_spherical_harmonic(l, m);
+                const double pre = SH::prefactor_spherical_harmonic(l, m);
                 for(unsigned int j=0; j<this->angular_points; j++) {
                     // get index positions
                     unsigned int idx = i * angular_points + j;
@@ -260,9 +256,9 @@ void AtomicGrid::calculate_rho_lm() {
                     const double azimuth = std::atan2(pos(1),pos(0));
                     const double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
 
-                    const double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
+                    const double y_lm = pre * SH::spherical_harmonic(l, m, pole, azimuth);
 
-                    this->rho_lm(i, n) += densities(idx) * y_lm * w;
+                    this->rho_lm(i, n) += densities(idx) * y_lm * w * wb;
                 }
                 this->rho_lm(i, n) *= 4.0 * M_PI;   // correct for unit sphere
 
@@ -272,6 +268,9 @@ void AtomicGrid::calculate_rho_lm() {
     }
 }
 
+/**
+ * @brief      calculate spherical harmonic coefficients
+ */
 void AtomicGrid::calculate_U_lm() {
     const size_t N = this->grid.size() / this->angular_points;
 
@@ -285,9 +284,9 @@ void AtomicGrid::calculate_U_lm() {
     const double h = 1.0 / (double)(N + 1);
 
     // calculate the size of the vector given a maximum angular quantum number
-    unsigned int lm = 0;
+    this->lm = 0;
     for(int l=0; l <= lmax; l++) {
-        lm += 2 * l + 1;
+        this->lm += 2 * l + 1;
     }
 
     // construct the finite difference matrix
@@ -363,7 +362,7 @@ void AtomicGrid::calculate_U_lm() {
     } // end constructing matrix
 
     // expand vector have appropriate size
-    U_lm = MatrixXXd::Zero(N, lm);
+    U_lm = MatrixXXd::Zero(N, this->lm);
 
     unsigned int n=0;
     // for each lm value, calculate the Ulm value
@@ -404,7 +403,8 @@ void AtomicGrid::calculate_U_lm() {
         }
     }
 
-    VectorXd V = VectorXd::Zero(this->grid.size());
+    this->V_fuzzy_cell = VectorXd::Zero(this->grid.size());
+    this->V = VectorXd::Zero(this->grid.size());
 
     // calculate V(r, theta, phi) from the radial density and the spherical harmonics
     // loop over radial points
@@ -412,7 +412,7 @@ void AtomicGrid::calculate_U_lm() {
         n = 0;
         for(int l=0; l<=lmax; l++) {
             for(int m=-l; m<=l; m++) {
-                const double pre = this->prefactor_spherical_harmonic(l, m);
+                const double pre = SH::prefactor_spherical_harmonic(l, m);
                 for(unsigned int j=0; j<this->angular_points; j++) {
                     // get grid index positions
                     unsigned int idx = i * angular_points + j;
@@ -425,16 +425,27 @@ void AtomicGrid::calculate_U_lm() {
                     const double azimuth = std::atan2(pos(1),pos(0));
                     const double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
 
-                    const double y_lm = pre * spherical_harmonic(l, m, pole, azimuth);
-                    V(idx) += 1.0 / r * y_lm * U_lm(i,n);
+                    const double y_lm = pre * SH::spherical_harmonic(l, m, pole, azimuth);
+                    this->V_fuzzy_cell(idx) += 1.0 / r * y_lm * U_lm(i,n);
                 }
                 n++;
             }
         }
     }
 
+    // construct splines for interpolation
+    this->interpolate_sh_coeff();
+}
+
+/**
+ * @brief      Calculates the j matrix.
+ */
+void AtomicGrid::calculate_J_matrix() {
+    VectorXd weights = this->get_weights();
     MatrixXXd amplitudes = this->get_amplitudes();     // get NxM amplitude matrix where N are the number of BF and M the gridpoints
-    VectorXd Vp = weights.cwiseProduct(V);
+
+    VectorXd Vp = weights.cwiseProduct(this->V);
+
     const unsigned int size = this->mol->get_nr_bfs();
     this->Jj = MatrixXXd::Zero(size, size);
 
@@ -445,108 +456,18 @@ void AtomicGrid::calculate_U_lm() {
             this->Jj(i,j) = this->Jj(j,i) = row_i.dot(amplitudes.row(j)) * 0.5;
         }
     }
-
-    // std::cout << "Numerical approximation of Jj:" << std::endl << this->Jj << std::endl;
 }
 
-double AtomicGrid::spherical_harmonic(int l, int m, double pole, double azimuth) const {
-    return this->polar_function(l, m, pole) * this->azimuthal_function(m, azimuth);
-}
-
-double AtomicGrid::prefactor_spherical_harmonic(int l, int m) const {
-    static const double pre = 1.0 / sqrt(4 * M_PI);
-    return pre * (m == 0 ? 1 : sqrt(2.0)) *
-            sqrt((double)(2 * l + 1) * boost::math::factorial<double>(l - std::abs(m)) /
-                 boost::math::factorial<double>(l + std::abs(m)) );
-}
-
-double AtomicGrid::polar_function(int l, int m, double theta) const {
-    return this->legendre_p(l, std::abs(m), cos(theta));
-}
-
-double AtomicGrid::azimuthal_function(int m, double phi) const {
-    if(m == 0) return 1.0;
-
-    if(m > 0) {
-        return cos((double)m * phi);
-    } else {
-        return sin(-(double)m * phi);
-    }
-}
-
-/* legendre function */
-
-double AtomicGrid::legendre (int n, double x) const {
-    int i;
-
-    if(n < 0) {
-        return -1;
-    }
-
-    double v[n];
-        v[0] = 1.0;
-
-    if(n < 1) {
-        return 1.0;
-    }
-
-    v[1] = x;
-
-    for ( i = 2; i <= n; i++ ) {
-          v[i] =     ( ( double ) ( 2 * i - 1 ) * x    * v[i-1]
-                     - ( double ) (     i - 1 ) *        v[i-2] )
-                     / ( double ) (     i     );
-    }
-
-    return v[n];
-}
-
-/* associated legendre function
+/**
+ * @brief      Gets the sh value.
  *
- * note that x should lie between -1 and 1 for this to work, else
- * a NAN will be returned
+ * @param[in]  r     radial distance from fuzzy cell center
+ * @param[in]  lm    lm index
+ *
+ * @return     The sh value.
  */
-
-double AtomicGrid::legendre_p (int n, int m, double x) const {
-    double fact;
-    int i;
-    int j;
-    int k;
-    double v[n+1];
-
-    for ( i = 0; i < n + 1; i++ ) {
-        v[i] = 0.0;
-    }
-
-    //
-    //  J = M is the first nonzero function.
-    //
-    if ( m <= n ) {
-        v[m] = 1.0;
-
-        fact = 1.0;
-        for ( k = 0; k < m; k++ ) {
-            v[m] *= - fact * sqrt ( 1.0 - x * x);
-            fact += 2.0;
-        }
-    }
-
-    //
-    //  J = M + 1 is the second nonzero function.
-    //
-    if ( m + 1 <= n ) {
-        v[m+1] = x * ( double ) ( 2 * m + 1 ) * v[m];
-    }
-    //
-    //  Now we use a three term recurrence.
-    //
-    for ( j = m + 2; j <= n; j++ ) {
-          v[j] = ( ( double ) ( 2 * j     - 1 ) * x * v[(j-1)]
-              + ( double ) (   - j - m + 1 ) *        v[(j-2)] )
-              / ( double ) (     j - m     );
-    }
-
-    return v[n];
+double AtomicGrid::get_sh_value(double r, unsigned int lm) const {
+    return this->splines[lm].eval(r);
 }
 
 double AtomicGrid::d2zdr2(double r, double m) {
@@ -574,4 +495,30 @@ void AtomicGrid::calculate_density() {
     }
 
     this->density_cached = true;
+}
+
+/**
+ * @brief      perform interpolation on the spherical harmonic coefficients
+ */
+void AtomicGrid::interpolate_sh_coeff() {
+    // clear any previously constructed splines
+    this->splines.clear();
+
+    // construct x values
+    std::vector<double> x;
+    for(int i=this->radial_points-1; i>=0; i--) {
+        x.push_back(this->r_n(i));
+    }
+
+    // calculate for each lm value the y values
+    for(unsigned int i=0; i<this->lm; i++) {
+        std::vector<double> y;
+        for(int j=this->radial_points-1; j>=0; j--) {
+            y.push_back(this->U_lm(j,i));
+        }
+
+        this->splines.push_back(Cspline());
+        this->splines.back().set_values(x,y);
+        this->splines.back().generate_spline();
+    }
 }

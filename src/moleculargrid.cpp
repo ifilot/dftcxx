@@ -304,14 +304,55 @@ double MolecularGrid::fk(unsigned int k, double mu) {
 }
 
 void MolecularGrid::calculate_hartree_potential() {
-    MatrixXXd J = MatrixXXd::Zero(this->mol->get_nr_bfs(), this->mol->get_nr_bfs());
-
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         std::cout << "Atomic density on " << (i+1) << ": " << this->atomic_grids[i]->get_density() << std::endl;
 
         this->atomic_grids[i]->calculate_rho_lm();
         this->atomic_grids[i]->calculate_U_lm();
+    }
 
+    for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+
+        for(unsigned int j=0; j<this->atomic_grids[i]->get_grid_size(); j++) {
+
+            double V = 0.0;
+
+            for(unsigned int k=0; k<this->atomic_grids.size(); k++) {
+                if(i == k) {    // obtain Vn for fuzzy cell
+                    V += this->atomic_grids[k]->get_V(j);
+                } else {        // interpolatie Vn
+
+                    // set lm index
+                    unsigned int lm = 0;
+
+                    // loop over l and m
+                    for(int l=0; l<=lmax; l++) {
+                        for(int m=-l; m<=l; m++) {
+
+                            const double pre = SH::prefactor_spherical_harmonic(l, m);
+                            const vec3 pos = this->atomic_grids[i]->get_position_grid_point(j) - this->atomic_grids[k]->get_position();
+
+                            // convert to spherical coordinates
+                            const double r = pos.norm(); // due to unit sphere
+                            const double azimuth = std::atan2(pos(1),pos(0));
+                            const double pole = std::acos(pos(2) / r); // due to unit sphere else z/r
+
+                            const double y_lm = pre * SH::spherical_harmonic(l, m, pole, azimuth);
+                            V += 1.0 / r * y_lm * this->atomic_grids[k]->get_sh_value(r, lm);
+
+                            lm++;
+                        }
+                    }
+                }
+            }
+
+            this->atomic_grids[i]->set_V_gp(j, V);
+        }
+    }
+
+    MatrixXXd J = MatrixXXd::Zero(this->mol->get_nr_bfs(), this->mol->get_nr_bfs());
+    for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+        this->atomic_grids[i]->calculate_J_matrix();
         J += this->atomic_grids[i]->get_J();
     }
 
