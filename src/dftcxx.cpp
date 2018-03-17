@@ -40,6 +40,14 @@ int main(int argc, char** argv) {
 
         const std::string input_filename = arg_input_filename.getValue();
 
+        std::cout << "--------------------------------------------------------------" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Executing DFTCXX v." << PROGRAM_VERSION << std::endl;
+        std::cout << "Author: Ivo Filot <ivo@ivofilot.nl>" << std::endl;
+        std::cout << std::endl;
+        std::cout << "--------------------------------------------------------------" << std::endl;
+        std::cout << std::endl;
+
         auto start = std::chrono::system_clock::now();
         auto mol = std::make_shared<Molecule>(input_filename);
 

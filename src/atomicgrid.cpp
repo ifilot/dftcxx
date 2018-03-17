@@ -21,11 +21,13 @@
 
 #include "atomicgrid.h"
 
+/**
+ * @brief      create atomic grid
+ *
+ * @param[in]  _atom  pointer to atom
+ */
 AtomicGrid::AtomicGrid(const std::shared_ptr<Atom>& _atom) :
-atom(_atom)
-{
-
-}
+atom(_atom) {}
 
 void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
                                     unsigned int _angular_points,
@@ -97,6 +99,7 @@ void AtomicGrid::create_atomic_grid(unsigned int _radial_points,
  * @return void
  */
 void AtomicGrid::set_density(const MatrixXXd& P) {
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size(); i++) {
         this->grid[i].set_density(P);
     }
@@ -125,6 +128,8 @@ double AtomicGrid::get_density() {
  */
 VectorXd AtomicGrid::get_weights() const {
     VectorXd weights = VectorXd(this->grid.size());
+
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size(); i++) {
         weights(i) = this->grid[i].get_weight();
     }
@@ -140,6 +145,8 @@ VectorXd AtomicGrid::get_weights() const {
  */
 VectorXd AtomicGrid::get_densities() const {
     VectorXd densities = VectorXd(this->grid.size());
+
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size(); i++) {
         densities(i) = this->grid[i].get_density();
     }
@@ -155,6 +162,8 @@ VectorXd AtomicGrid::get_densities() const {
  */
 MatrixXXd AtomicGrid::get_positions() const {
     MatrixXXd positions = MatrixXXd(this->grid.size(), 3);
+
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size(); i++) {
         for(unsigned int j=0; j<3; j++) {
             positions(i,j) = this->grid[i].get_position()[j];
@@ -174,6 +183,7 @@ void AtomicGrid::set_becke_weights(const VectorXd& vw) {
         throw std::runtime_error("Dimension of correction vector does not match dimension of grid");
     }
 
+    #pragma omp parallel for
     for(unsigned int i=0; i<vw.size(); i++) {
         this->grid[i].multiply_weight(vw(i));
         this->grid[i].set_becke_weight(vw(i));
@@ -189,6 +199,7 @@ void AtomicGrid::set_becke_weights(const VectorXd& vw) {
 MatrixXXd AtomicGrid::get_amplitudes() const {
     MatrixXXd amplitudes = MatrixXXd(this->mol->get_nr_bfs(), this->grid.size());
 
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size(); i++) {
         const VectorXd bfs = this->grid[i].get_basis_func_amp();
         for(unsigned int j=0; j<this->mol->get_nr_bfs(); j++) {
@@ -365,10 +376,12 @@ void AtomicGrid::calculate_U_lm() {
     // expand vector have appropriate size
     U_lm = MatrixXXd::Zero(N, this->lm);
 
-    unsigned int n=0;
     // for each lm value, calculate the Ulm value
+    #pragma omp parallel for
     for(int l=0; l<=lmax; l++) {
         for(int m=-l; m<=l; m++) {
+            unsigned int n = this->calculate_lm(l,m);
+
             // construct the divergence vector
             VectorXd g = VectorXd::Zero(N+2);
             MatrixXXd M(A); // make a copy of matrix A
@@ -400,7 +413,6 @@ void AtomicGrid::calculate_U_lm() {
             for(unsigned int i=1; i<N+1; i++) {
                 this->U_lm(i-1,n) = b(i);
             }
-            n++;
         }
     }
 
@@ -450,6 +462,7 @@ void AtomicGrid::calculate_J_matrix() {
     const unsigned int size = this->mol->get_nr_bfs();
     this->Jj = MatrixXXd::Zero(size, size);
 
+    #pragma omp parallel for
     for(unsigned int i=0; i<size; i++) {
         VectorXd row = amplitudes.row(i);
         VectorXd row_i = Vp.cwiseProduct(row);
@@ -490,11 +503,14 @@ double AtomicGrid::dzdrsq(double r, double m) {
  *
  */
 void AtomicGrid::calculate_density() {
-    this->density = 0.0;
+    double d = 0.0;
+
+    #pragma omp parallel for reduction(+:d)
     for(unsigned int i=0; i<this->grid.size(); i++) {
-        this->density += this->grid[i].get_weight() * this->grid[i].get_density();
+        d += this->grid[i].get_weight() * this->grid[i].get_density();
     }
 
+    this->density = d;
     this->density_cached = true;
 }
 
