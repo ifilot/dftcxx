@@ -1,5 +1,5 @@
 nitrogen molecule
-basis/sto3g.dat
+basis/p631.dat
 angstrom
 2
 N         0.000000        0.000000        0.000000

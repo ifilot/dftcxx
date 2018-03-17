@@ -1,23 +1,23 @@
-/*************************************************************************
- *
- *  This file is part of DFTCXX.
- *
- *  Author: Ivo Filot <i.a.w.filot@tue.nl>
- *
- *  DFTCXX is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  DFTCXX is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
- *
- ************************************************************************/
+/**************************************************************************
+ *   This file is part of DFTCXX.                                         *
+ *                                                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
+ *                                                                        *
+ *   DFTCXX is free software:                                             *
+ *   you can redistribute it and/or modify it under the terms of the      *
+ *   GNU General Public License as published by the Free Software         *
+ *   Foundation, either version 3 of the License, or (at your option)     *
+ *   any later version.                                                   *
+ *                                                                        *
+ *   DFTCXX is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
+ *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
+ *   See the GNU General Public License for more details.                 *
+ *                                                                        *
+ *   You should have received a copy of the GNU General Public License    *
+ *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *                                                                        *
+ **************************************************************************/
 
 #ifndef _MOLECULAR_GRID_H
 #define _MOLECULAR_GRID_H
@@ -103,6 +103,36 @@ public:
     };
 
     /**
+     * @brief      Sets the grid fineness.
+     *
+     * @param[in]  fineness  fineness constant
+     */
+    void set_grid_fineness(unsigned int fineness);
+
+    /**
+     * @brief      Sets the grid parameters (fine-tuning)
+     *
+     * @param[in]  _radial_points  number of radial points
+     * @param[in]  _lebedev_order  The lebedev order
+     * @param[in]  _lmax           maximum angular momentum for spherical harmonics
+     */
+    void set_grid_parameters(unsigned int _radial_points, unsigned int _lebedev_order, unsigned int _lmax);
+
+    /**
+     * @fn create_grid
+     * @brief creates the molecular grid
+     *
+     * Creates a molecular grid given a set of atoms and a set of
+     * basis functions. For each atom, an atomic grid is created. The
+     * numerical integration is carried out over all the atomic grids. The
+     * contribution of the atomic grid to the overall integration over the
+     * whole molecule is controlled via a weight factor as defined by Becke.
+     *
+     * @return void
+     */
+    void create_grid();
+
+    /**
      * @fn set_density
      * @brief set the density at the grid point given a density matrix
      *
@@ -115,11 +145,12 @@ public:
      */
     void set_density(const MatrixXXd& P);
 
-    void calculate_hartree_potential();
-
-    /*
-     *  vector & matrix getters
+    /**
+     * @brief      Calculates the hartree potential.
+     *
+     * @return     The hartree potential.
      */
+    MatrixXXd calculate_hartree_potential();
 
     /**
      * @fn get_weights
@@ -146,23 +177,6 @@ public:
     MatrixXXd get_amplitudes() const;
 
 private:
-
-    /**
-     * @fn create_grid
-     * @brief creates the molecular grid
-     *
-     * @param fineness      ENUM (unsigned int) defining the resolution of the grid
-     *
-     * Creates a molecular grid given a set of atoms and a set of
-     * basis functions. For each atom, an atomic grid is created. The
-     * numerical integration is carried out over all the atomic grids. The
-     * contribution of the atomic grid to the overall integration over the
-     * whole molecule is controlled via a weight factor as defined by Becke.
-     *
-     * @return void
-     */
-    void create_grid(unsigned int fineness);
-
     /**
      * @fn get_becke_weight_pn
      * @brief calculate Pn(r) (i.e. for a single gridpoint) for atom n (eq. 22 in A.D. Becke J.Chem.Phys. 88, 2547)

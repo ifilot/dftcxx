@@ -1,7 +1,7 @@
 /**************************************************************************
- *   dftcxx.cpp  --  This file is part of DFTCXX.                         *
+ *   This file is part of DFTCXX.                                         *
  *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
  *                                                                        *
  *   DFTCXX is free software:                                             *
  *   you can redistribute it and/or modify it under the terms of the      *
@@ -21,28 +21,42 @@
 
 #include <chrono>
 #include <boost/format.hpp>
+#include <tclap/CmdLine.h>
 
 #include "molecule.h"
 #include "dft.h"
+#include "config.h"
 
 int main(int argc, char** argv) {
 
-    if(argc != 2) {
-        std::cerr << "Please specify an input file" << std::endl;
-        exit(-1);
+    try {
+        TCLAP::CmdLine cmd("Perform DFT calculation.", ' ', PROGRAM_VERSION);
+
+        // input filename
+        TCLAP::ValueArg<std::string> arg_input_filename("i","input","Input file (i.e. h2.in)",true,"h2.in","filename");
+        cmd.add(arg_input_filename);
+
+        cmd.parse(argc, argv);
+
+        const std::string input_filename = arg_input_filename.getValue();
+
+        auto start = std::chrono::system_clock::now();
+        auto mol = std::make_shared<Molecule>(input_filename);
+
+        DFT dft;
+        dft.add_molecule(mol);
+        dft.set_hartree_evaluation(DFT::BECKE_GRID);
+        dft.scf();
+
+        auto end = std::chrono::system_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        std::cout << boost::format("Total elapsed time: %f ms\n") % elapsed.count();
+
+        return 0;
+
+    } catch (TCLAP::ArgException &e) {
+        std::cerr << "error: " << e.error() <<
+                     " for arg " << e.argId() << std::endl;
+        return -1;
     }
-
-    auto start = std::chrono::system_clock::now(); //toc
-
-    auto mol = std::make_shared<Molecule>(argv[1]);
-
-    DFT dft;
-    dft.add_molecule(mol);
-    dft.scf();
-
-    auto end = std::chrono::system_clock::now(); //toc
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    std::cout << boost::format("Total elapsed time: %f ms\n") % elapsed.count();
-
-    return 0;
 }

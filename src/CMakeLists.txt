@@ -26,6 +26,12 @@ project (dftcxx)
 # add custom directory to look for .cmake files
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules )
 
+# prepare configuration file
+SET(VERSION_MAJOR "1")
+SET(VERSION_MINOR "0")
+SET(VERSION_MICRO "0")
+configure_file(config.h.in ../src/config.h @ONLY)
+
 # Enable release build
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to 'Release' as none was specified.")
@@ -63,10 +69,12 @@ SET (BOOST_ALL_DYN_LINK OFF)
 find_package(Boost REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(EIGEN eigen3 REQUIRED)
+pkg_check_modules(TCLAP tclap REQUIRED)
 
 # Set include folders
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_BINARY_DIR}
+                    ${TCLAP_INCLUDE_DIR}
                     ${Boost_INCLUDE_DIRS}
                     ${EIGEN_INCLUDE_DIRS})
 

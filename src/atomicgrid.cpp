@@ -1,23 +1,23 @@
-/*************************************************************************
- *
- *  This file is part of DFTCXX.
- *
- *  Author: Ivo Filot <i.a.w.filot@tue.nl>
- *
- *  DFTCXX is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  DFTCXX is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
- *
- ************************************************************************/
+/**************************************************************************
+ *   This file is part of DFTCXX.                                         *
+ *                                                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
+ *                                                                        *
+ *   DFTCXX is free software:                                             *
+ *   you can redistribute it and/or modify it under the terms of the      *
+ *   GNU General Public License as published by the Free Software         *
+ *   Foundation, either version 3 of the License, or (at your option)     *
+ *   any later version.                                                   *
+ *                                                                        *
+ *   DFTCXX is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
+ *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
+ *   See the GNU General Public License for more details.                 *
+ *                                                                        *
+ *   You should have received a copy of the GNU General Public License    *
+ *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *                                                                        *
+ **************************************************************************/
 
 #include "atomicgrid.h"
 
@@ -229,8 +229,9 @@ void AtomicGrid::calculate_rho_lm() {
     VectorXd densities = this->get_densities();
     VectorXd rho_n = weights.cwiseProduct(densities);
 
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size() / this->angular_points; i++) {
-        n = 0;
+        unsigned int cnt = 0;
 
         // calculate total radial density
         for(unsigned int j=0; j<this->angular_points; j++) {
@@ -258,11 +259,11 @@ void AtomicGrid::calculate_rho_lm() {
 
                     const double y_lm = pre * SH::spherical_harmonic(l, m, pole, azimuth);
 
-                    this->rho_lm(i, n) += densities(idx) * y_lm * w * wb;
+                    this->rho_lm(i, cnt) += densities(idx) * y_lm * w * wb;
                 }
-                this->rho_lm(i, n) *= 4.0 * M_PI;   // correct for unit sphere
+                this->rho_lm(i, cnt) *= 4.0 * M_PI;   // correct for unit sphere
 
-                n++;
+                cnt++;
             }
         }
     }
@@ -277,10 +278,6 @@ void AtomicGrid::calculate_U_lm() {
     static const double sqrt4pi = std::sqrt(4.0 * M_PI);
     VectorXd weights = this->get_weights();
     const double q_n = this->get_density();
-
-    double c1 = 0.0;    // constant for d2U/dz2
-    double c2 = 0.0;    // constant for (dU/dz)^2
-
     const double h = 1.0 / (double)(N + 1);
 
     // calculate the size of the vector given a maximum angular quantum number
@@ -293,7 +290,11 @@ void AtomicGrid::calculate_U_lm() {
     MatrixXXd A = MatrixXXd::Zero(N+2,N+2);
 
     // start constructing matrix
+    #pragma omp parallel for
     for(unsigned int i=0; i<N+2; i++) {
+
+        double c1 = 0.0;    // constant for d2U/dz2
+        double c2 = 0.0;    // constant for (dU/dz)^2
 
         if(i > 0 && i < N+1) {
             c1 = dzdrsq(r_n(i-1), 1.0);
@@ -408,10 +409,11 @@ void AtomicGrid::calculate_U_lm() {
 
     // calculate V(r, theta, phi) from the radial density and the spherical harmonics
     // loop over radial points
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->grid.size() / this->angular_points; i++) {
-        n = 0;
         for(int l=0; l<=lmax; l++) {
             for(int m=-l; m<=l; m++) {
+                unsigned int n = this->calculate_lm(l,m);
                 const double pre = SH::prefactor_spherical_harmonic(l, m);
                 for(unsigned int j=0; j<this->angular_points; j++) {
                     // get grid index positions
@@ -428,7 +430,6 @@ void AtomicGrid::calculate_U_lm() {
                     const double y_lm = pre * SH::spherical_harmonic(l, m, pole, azimuth);
                     this->V_fuzzy_cell(idx) += 1.0 / r * y_lm * U_lm(i,n);
                 }
-                n++;
             }
         }
     }
@@ -521,4 +522,21 @@ void AtomicGrid::interpolate_sh_coeff() {
         this->splines.back().set_values(x,y);
         this->splines.back().generate_spline();
     }
+}
+
+/**
+ * @brief      calculate lm index
+ *
+ * @param[in]  l     l quantum number
+ * @param[in]  m     m quantum number
+ *
+ * @return     the lm index
+ */
+unsigned int AtomicGrid::calculate_lm(unsigned int l, unsigned int m) {
+    unsigned int lm_idx = 0;
+    for(int i=0; i < l; i++) {
+        lm_idx += 2 * i + 1;
+    }
+
+    return lm_idx + l + m;
 }

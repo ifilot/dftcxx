@@ -1,7 +1,7 @@
 /**************************************************************************
- *   dft.h  --  This file is part of DFTCXX.                              *
+ *   This file is part of DFTCXX.                                         *
  *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
  *                                                                        *
  *   DFTCXX is free software:                                             *
  *   you can redistribute it and/or modify it under the terms of the      *
@@ -37,41 +37,7 @@ typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
 
 class DFT {
-public:
-    /**
-     * @fn DFT
-     * @brief DFT routine constructor
-     *
-     * @return DFT instance
-     */
-    DFT();
-
-    /**
-     * @fn add_molecule
-     * @brief add molecule to the DFT routine
-     *
-     * @param _mol  pointer to Molecule class
-     *
-     * Links molecule to the DFT routine by a pointer. The
-     * Contracted Gaussian Functions of the molecule are copied
-     * to the DFT routine class and the routine matrices are
-     * constructed.
-     *
-     * @return void
-     */
-    void add_molecule(const std::shared_ptr<Molecule>& _mol);
-
-    /**
-     * @fn scf
-     * @brief perform the self-consistent field iterations
-     *
-     * @return void
-     */
-    void scf();
-
 private:
-    static constexpr double pi = 3.14159265358979323846;
-
     std::shared_ptr<Molecule> mol;              // pointer to molecule class
     std::unique_ptr<MolecularGrid> molgrid;     // pointer to molecular grid
     std::shared_ptr<Integrator> integrator;     // pointer to integrator class
@@ -103,6 +69,58 @@ private:
 
     bool is_first;      // whether this is the first iteration
 
+    unsigned int hartree_evaluation_method; //!< method of calculating hartree potential
+
+public:
+
+    enum {
+        BECKE_GRID,
+        TWO_ELECTRON_INTEGRALS,
+
+        NUM_HARTEE_EVALUATION
+    };
+
+    /**
+     * @fn DFT
+     * @brief DFT routine constructor
+     *
+     * @return DFT instance
+     */
+    DFT();
+
+    /**
+     * @fn add_molecule
+     * @brief add molecule to the DFT routine
+     *
+     * @param _mol  pointer to Molecule class
+     *
+     * Links molecule to the DFT routine by a pointer. The
+     * Contracted Gaussian Functions of the molecule are copied
+     * to the DFT routine class and the routine matrices are
+     * constructed.
+     *
+     * @return void
+     */
+    void add_molecule(const std::shared_ptr<Molecule>& _mol);
+
+    /**
+     * @fn scf
+     * @brief perform the self-consistent field iterations
+     *
+     * @return void
+     */
+    void scf();
+
+    /**
+     * @brief      Sets the hartree evaluation.
+     *
+     * @param[in]  method  The method
+     */
+    inline void set_hartree_evaluation(unsigned int method) {
+        this->hartree_evaluation_method = method;
+    }
+
+private:
     /*
      * construction functions
      */
@@ -195,6 +213,16 @@ private:
      * @return void
      */
     void calculate_energy();
+
+    /**
+     * @brief      Calculates the hartree potential from two electrons integrals
+     */
+    void calculate_hartree_potential_te_int();
+
+    /**
+     * @brief      Calculates the hartree potential over Becke grid using Poisson equation
+     */
+    void calculate_hartree_potential_becke_poisson();
 };
 
 #endif //_DFT_H

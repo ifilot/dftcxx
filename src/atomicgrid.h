@@ -1,23 +1,23 @@
-/*************************************************************************
- *
- *  This file is part of DFTCXX.
- *
- *  Author: Ivo Filot <i.a.w.filot@tue.nl>
- *
- *  DFTCXX is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  DFTCXX is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
- *
- ************************************************************************/
+/**************************************************************************
+ *   This file is part of DFTCXX.                                         *
+ *                                                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
+ *                                                                        *
+ *   DFTCXX is free software:                                             *
+ *   you can redistribute it and/or modify it under the terms of the      *
+ *   GNU General Public License as published by the Free Software         *
+ *   Foundation, either version 3 of the License, or (at your option)     *
+ *   any later version.                                                   *
+ *                                                                        *
+ *   DFTCXX is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
+ *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
+ *   See the GNU General Public License for more details.                 *
+ *                                                                        *
+ *   You should have received a copy of the GNU General Public License    *
+ *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *                                                                        *
+ **************************************************************************/
 
 #ifndef _ATOMIC_GRID_H
 #define _ATOMIC_GRID_H
@@ -253,6 +253,16 @@ private:
      * @brief      perform interpolation on the spherical harmonic coefficients
      */
     void interpolate_sh_coeff();
+
+    /**
+     * @brief      calculate lm index
+     *
+     * @param[in]  l     l quantum number
+     * @param[in]  m     m quantum number
+     *
+     * @return     the lm index
+     */
+    unsigned int calculate_lm(unsigned int l, unsigned int m);
 };
 
 #endif //_ATOMIC_GRID_H

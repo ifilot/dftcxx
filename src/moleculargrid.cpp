@@ -1,23 +1,23 @@
-/*************************************************************************
- *
- *  This file is part of DFTCXX.
- *
- *  Author: Ivo Filot <i.a.w.filot@tue.nl>
- *
- *  DFTCXX is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  DFTCXX is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
- *
- ************************************************************************/
+/**************************************************************************
+ *   This file is part of DFTCXX.                                         *
+ *                                                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
+ *                                                                        *
+ *   DFTCXX is free software:                                             *
+ *   you can redistribute it and/or modify it under the terms of the      *
+ *   GNU General Public License as published by the Free Software         *
+ *   Foundation, either version 3 of the License, or (at your option)     *
+ *   any later version.                                                   *
+ *                                                                        *
+ *   DFTCXX is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
+ *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
+ *   See the GNU General Public License for more details.                 *
+ *                                                                        *
+ *   You should have received a copy of the GNU General Public License    *
+ *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *                                                                        *
+ **************************************************************************/
 
 #include "moleculargrid.h"
 
@@ -32,7 +32,6 @@
 MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
     this->mol = _mol;
     this->grid_size = 0;
-    this->create_grid(GRID_ULTRAFINE);
 }
 
 /**
@@ -47,6 +46,7 @@ MolecularGrid::MolecularGrid(const std::shared_ptr<Molecule>& _mol) {
  * @return void
  */
 void MolecularGrid::set_density(const MatrixXXd& P) {
+    #pragma omp parallel for
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         this->atomic_grids[i]->set_density(P);
     }
@@ -60,14 +60,17 @@ void MolecularGrid::set_density(const MatrixXXd& P) {
  */
 VectorXd MolecularGrid::get_weights() const {
     VectorXd weights = VectorXd::Zero(this->grid_size);
-    unsigned int idx = 0;
+    unsigned int idx =0;
 
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         VectorXd vec_weight = this->atomic_grids[i]->get_weights();
+
+        #pragma omp parallel for
         for(unsigned int j=0; j<vec_weight.size(); j++) {
-            weights(idx) = vec_weight(j);
-            idx++;
+            weights(idx + j) = vec_weight(j);
         }
+
+        idx += vec_weight.size();
     }
 
     return weights;
@@ -85,10 +88,13 @@ VectorXd MolecularGrid::get_densities() const {
 
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         VectorXd vec_densities = this->atomic_grids[i]->get_densities();
+
+        #pragma omp parallel for
         for(unsigned int j=0; j<vec_densities.size(); j++) {
-            densities(idx) = vec_densities(j);
-            idx++;
+            densities(idx + j) = vec_densities(j);
         }
+
+        idx += vec_densities.size();
     }
 
     return densities;
@@ -107,12 +113,14 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         MatrixXXd agrid_amplitudes = this->atomic_grids[i]->get_amplitudes();
 
+        #pragma omp parallel for
         for(unsigned int j = 0; j<this->atomic_grids[i]->get_grid_size(); j++) {
             for(unsigned int k=0; k<this->mol->get_nr_bfs(); k++) {
-                amplitudes(k,idx) = agrid_amplitudes(k,j);
+                amplitudes(k, idx + j) = agrid_amplitudes(k,j);
             }
-            idx++;
         }
+
+        idx += this->atomic_grids[i]->get_grid_size();
     }
 
     return amplitudes;
@@ -129,6 +137,8 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
  */
 double MolecularGrid::calculate_density() const {
     double sum = 0.0;
+
+    #pragma omp parallel for reduction(+:sum)
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
         sum += this->atomic_grids[i]->get_density();
     }
@@ -137,21 +147,11 @@ double MolecularGrid::calculate_density() const {
 }
 
 /**
- * @fn create_grid
- * @brief creates the molecular grid
+ * @brief      Sets the grid fineness.
  *
- * @param fineness      ENUM (unsigned int) defining the resolution of the grid
- *
- * Creates a molecular grid given a set of atoms and a set of
- * basis functions. For each atom, an atomic grid is created. The
- * numerical integration is carried out over all the atomic grids. The
- * contribution of the atomic grid to the overall integration over the
- * whole molecule is controlled via a weight factor as defined by Becke.
- *
- * @return void
+ * @param[in]  fineness  fineness constant
  */
-void MolecularGrid::create_grid(unsigned int fineness) {
-
+void MolecularGrid::set_grid_fineness(unsigned int fineness) {
     // set the resolution of the grid
     switch(fineness) {
         case GRID_COARSE:
@@ -180,7 +180,34 @@ void MolecularGrid::create_grid(unsigned int fineness) {
             this->lmax = 8;
         break;
     }
+}
 
+/**
+ * @brief      Sets the grid parameters (fine-tuning)
+ *
+ * @param[in]  _radial_points  number of radial points
+ * @param[in]  _lebedev_order  The lebedev order
+ * @param[in]  _lmax           maximum angular momentum for spherical harmonics
+ */
+void MolecularGrid::set_grid_parameters(unsigned int _radial_points, unsigned int _lebedev_order, unsigned int _lmax) {
+    this->radial_points = _radial_points;
+    this->lebedev_order = _lebedev_order;
+    this->lmax = _lmax;
+}
+
+/**
+ * @fn create_grid
+ * @brief creates the molecular grid
+ *
+ * Creates a molecular grid given a set of atoms and a set of
+ * basis functions. For each atom, an atomic grid is created. The
+ * numerical integration is carried out over all the atomic grids. The
+ * contribution of the atomic grid to the overall integration over the
+ * whole molecule is controlled via a weight factor as defined by Becke.
+ *
+ * @return void
+ */
+void MolecularGrid::create_grid() {
     // calculate number of angular points
     this->angular_points = Quadrature::num_lebedev_points[this->lebedev_order];
 
@@ -303,16 +330,20 @@ double MolecularGrid::fk(unsigned int k, double mu) {
     return mu;
 }
 
-void MolecularGrid::calculate_hartree_potential() {
+/**
+ * @brief      Calculates the hartree potential.
+ *
+ * @return     The hartree potential.
+ */
+MatrixXXd MolecularGrid::calculate_hartree_potential() {
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
-        std::cout << "Atomic density on " << (i+1) << ": " << this->atomic_grids[i]->get_density() << std::endl;
-
         this->atomic_grids[i]->calculate_rho_lm();
         this->atomic_grids[i]->calculate_U_lm();
     }
 
     for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
 
+        #pragma omp parallel for
         for(unsigned int j=0; j<this->atomic_grids[i]->get_grid_size(); j++) {
 
             double V = 0.0;
@@ -356,5 +387,5 @@ void MolecularGrid::calculate_hartree_potential() {
         J += this->atomic_grids[i]->get_J();
     }
 
-    std::cout << J << std::endl;
+    return J;
 }

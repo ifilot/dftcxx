@@ -1,23 +1,23 @@
-/*************************************************************************
- *
- *  This file is part of DFTCXX.
- *
- *  Author: Ivo Filot <i.a.w.filot@tue.nl>
- *
- *  DFTCXX is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  DFTCXX is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with DFTCXX.  If not, see <http://www.gnu.org/licenses/>.
- *
- ************************************************************************/
+/**************************************************************************
+ *   This file is part of DFTCXX.                                         *
+ *                                                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
+ *                                                                        *
+ *   DFTCXX is free software:                                             *
+ *   you can redistribute it and/or modify it under the terms of the      *
+ *   GNU General Public License as published by the Free Software         *
+ *   Foundation, either version 3 of the License, or (at your option)     *
+ *   any later version.                                                   *
+ *                                                                        *
+ *   DFTCXX is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty          *
+ *   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.              *
+ *   See the GNU General Public License for more details.                 *
+ *                                                                        *
+ *   You should have received a copy of the GNU General Public License    *
+ *   along with this program.  If not, see http://www.gnu.org/licenses/.  *
+ *                                                                        *
+ **************************************************************************/
 
 #include "cspline.h"
 
@@ -153,10 +153,8 @@ double Cspline::eval(double xx) const {
         throw std::runtime_error("Spline interpolation was not performed, cannot evaluate.");
     }
 
-    if(xx<x[0]) {
-        std::stringstream error;
-        error << "Spline starts at x="<< x[0] << " but is evaluated at x=" << xx;
-        throw std::runtime_error(error.str());
+    if(xx < x[0]) {
+        return y.front();
     }
     if(xx >= x.back()) {
         return y.back();
