@@ -77,6 +77,8 @@ void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
  * @return void
  */
 void DFT::scf() {
+    static const unsigned int max_iterations = 100;
+
     std::cout << "          Starting calculation          " << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << "  #        energy    elec" << std::endl;
@@ -115,11 +117,20 @@ void DFT::scf() {
 
         difference = std::abs(this->et - old_energy);
         old_energy = this->et;
+
+        if(iteration >= max_iterations) {
+            std::cout << "========================================" << std::endl;
+            std::cout << "Stopping because maximum number of iterations has been reached." << std::endl;
+            std::cout << std::endl;
+            break;
+        }
     }
 
-    std::cout << "========================================" << std::endl;
-    std::cout << "Stopping because energy criterion is reached." << std::endl;
-    std::cout << std::endl;
+    if(iteration < max_iterations) {
+        std::cout << "========================================" << std::endl;
+        std::cout << "Stopping because energy criterion is reached." << std::endl;
+        std::cout << std::endl;
+    }
 }
 
 /**
@@ -307,7 +318,7 @@ void DFT::calculate_transformation_matrix() {
  * @return void
  */
 void DFT::calculate_density_matrix() {
-    static const double alpha = 0.25; // mixing parameter alpha (NOTE: obtain this value from input file...)
+    static const double alpha = 0.50; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     MatrixXXd F = this->H + 2.0 * this->J + this->XC;
