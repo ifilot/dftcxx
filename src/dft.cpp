@@ -55,7 +55,7 @@ void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
 
     // construct molecular grid based on molecule and basis functions
     this->molgrid = std::make_unique<MolecularGrid>(this->mol);
-    this->molgrid->set_grid_fineness(MolecularGrid::GRID_FINE);
+    this->molgrid->set_grid_fineness(MolecularGrid::GRID_MEDIUM);
     this->molgrid->create_grid();
 
     // copy the contracted gaussian functions to the DFT class
@@ -208,7 +208,7 @@ void DFT::construct_matrices() {
 
     // calculate the electronic repulsion matrix from the density
     // matrix and the two-electron integrals
-    if(this->hartree_evaluation_method = DFT::TWO_ELECTRON_INTEGRALS) {
+    if(this->hartree_evaluation_method == DFT::TWO_ELECTRON_INTEGRALS) {
         this->calculate_two_electron_integrals();
     }
 
