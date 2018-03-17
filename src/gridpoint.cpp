@@ -19,45 +19,47 @@
  *                                                                        *
  **************************************************************************/
 
-#ifndef _FUNCTIONALS_H
-#define _FUNCTIONALS_H
+#include "gridpoint.h"
 
-#include <Eigen/Dense>
-#include <boost/math/special_functions/factorials.hpp>
+/**
+ * @fn GridPoint
+ * @brief GridPoint Constructor
+ *
+ * @param _r    vec3 position of the grid point
+ *
+ * @return GridPoint instance
+ */
+GridPoint::GridPoint(const vec3& _r, const vec3& _r_at):
+    r(_r),
+    r_at(_r_at)
+    {}
 
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
+/**
+ * @fn set_basis_func_amp
+ * @brief calculates the amplitudes at the grid point of all basis functions
+ *
+ * @param _mol      pointer to the molecule object
+ *
+ * @return void
+ */
+void GridPoint::set_basis_func_amp(const std::shared_ptr<Molecule>& _mol) {
+    const unsigned int size = _mol->get_nr_bfs();
+    this->basis_func_amp = VectorXd(size);
 
-class Functional {
-public:
-    Functional();
+    for(unsigned int i=0; i<size; i++) {
+        this->basis_func_amp(i) = _mol->get_cgf(i).get_amp(this->r);
+    }
+}
 
-    // functionals
-    void xalpha_x_functional(const VectorXd& densitiesa,
-                             const VectorXd& densitiesb,
-                             VectorXd& ex,
-                             VectorXd& vxa,
-                             VectorXd& vxb);
-
-    void vwm_c_functional(const VectorXd& densitiesa,
-                          const VectorXd& densitiesb,
-                          VectorXd& ec,
-                          VectorXd& vca,
-                          VectorXd& vcb);
-
-private:
-    static constexpr double pi = 3.14159265358979323846;
-
-    // auxiliary functions
-    double vwn_xx(double x, double b, double c);
-    double vwn_epsp(double x);
-    double vwn_epsf(double x);
-    double vwn_eps(double x, double a, double x0, double b, double c);
-    double vwn_depsp(double x);
-    double vwn_depsf(double x);
-    double vwn_deps(double x, double a, double x0, double b, double c);
-    double vwn_g(double z);
-    double vwn_dg(double z);
-};
-
-#endif //_FUNCTIONALS_H
+/**
+ * @fn set_density
+ * @brief calculates the density at the grid point using the density matrix
+ *
+ * @param _mol      reference to density matrix
+ *
+ * @return void
+ */
+void GridPoint::set_density(const MatrixXXd& D) {
+    this->density = 2.0 * this->basis_func_amp.dot(
+                        D * this->basis_func_amp);
+}

@@ -1,7 +1,7 @@
 /**************************************************************************
- *   molecule.h  --  This file is part of DFTCXX.                         *
+ *   This file is part of DFTCXX.                                         *
  *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
  *                                                                        *
  *   DFTCXX is free software:                                             *
  *   you can redistribute it and/or modify it under the terms of the      *
@@ -25,6 +25,7 @@
 #include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 #include <string>
 #include <bitset>
 #include <fstream>
@@ -35,6 +36,8 @@ typedef Eigen::Vector3d vec3;
 
 class Atom {
 public:
+    Atom();
+
     Atom(unsigned int atnr, const vec3& _position);
 
     inline const vec3& get_position() const {
@@ -72,20 +75,20 @@ public:
         return &this->cgfs;
     }
 
-    inline const Atom& get_atom(unsigned int i) const {
+    inline const std::shared_ptr<Atom>& get_atom(unsigned int i) const {
         return this->atoms[i];
     }
 
     inline const vec3& get_atomic_position(unsigned int i) const {
-        return this->atoms[i].get_position();
+        return this->atoms[i]->get_position();
     }
 
     inline const unsigned int get_atomic_charge(unsigned int i) const {
-        return this->atoms[i].get_charge();
+        return this->atoms[i]->get_charge();
     }
 
     inline void add_atom(const Atom& atom) {
-        this->atoms.push_back(atom);
+        this->atoms.emplace_back(std::make_shared<Atom>(atom));
     }
 
     inline void add_cgf(unsigned int atid, const CGF cgf) {
@@ -97,7 +100,7 @@ public:
     unsigned int get_nr_elec() const;
 
 private:
-    std::vector<Atom> atoms;
+    std::vector<std::shared_ptr<Atom>> atoms;
     std::vector<CGF> cgfs;  // vector of cgfs of this molecule
 
     unsigned int get_atom_number_from_string(std::string el);

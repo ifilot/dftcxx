@@ -1,7 +1,7 @@
 /**************************************************************************
- *   dft.cpp  --  This file is part of DFTCXX.                            *
+ *   This file is part of DFTCXX.                                         *
  *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
  *                                                                        *
  *   DFTCXX is free software:                                             *
  *   you can redistribute it and/or modify it under the terms of the      *
@@ -29,7 +29,8 @@
  */
 DFT::DFT() {
     is_first = true;
-};
+    this->hartree_evaluation_method = DFT::BECKE_GRID;
+}
 
 /**
  * @fn add_molecule
@@ -54,6 +55,8 @@ void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
 
     // construct molecular grid based on molecule and basis functions
     this->molgrid = std::make_unique<MolecularGrid>(this->mol);
+    this->molgrid->set_grid_fineness(MolecularGrid::GRID_FINE);
+    this->molgrid->create_grid();
 
     // copy the contracted gaussian functions to the DFT class
     this->copy_cgfs_from_molecule();
@@ -176,8 +179,10 @@ void DFT::construct_matrices() {
             V(i,j) = V(j,i) = v_sum;
         }
     }
+
     // calculate single-electron matrix by summing T and V matrices
     this->H = this->T + this->V;
+
     // calculate nuclear repulsion energy
     this->calculate_nuclear_repulsion();
 
@@ -192,7 +197,9 @@ void DFT::construct_matrices() {
 
     // calculate the electronic repulsion matrix from the density
     // matrix and the two-electron integrals
-    this->calculate_electronic_repulsion_matrix();
+    if(this->hartree_evaluation_method = DFT::TWO_ELECTRON_INTEGRALS) {
+        this->calculate_two_electron_integrals();
+    }
 
     // calculate the total energy of the molecule
     this->calculate_energy();
@@ -212,7 +219,7 @@ void DFT::calculate_nuclear_repulsion() {
             this->enuc += this->mol->get_atomic_charge(i) *
                           this->mol->get_atomic_charge(j) /
                           (this->mol->get_atomic_position(i) -
-                           this->mol->get_atomic_position(j)).norm();
+                          this->mol->get_atomic_position(j)).norm();
         }
     }
 }
@@ -269,7 +276,7 @@ void DFT::calculate_two_electron_integrals() {
  *
  * @return void
  */
-void DFT::calculate_transformation_matrix(bool sort) {
+void DFT::calculate_transformation_matrix() {
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(S);
@@ -299,8 +306,8 @@ void DFT::calculate_transformation_matrix(bool sort) {
  *
  * @return void
  */
-void DFT::calculate_density_matrix(bool sort) {
-    static const double alpha = 0.50; // mixing parameter alpha (NOTE: obtain this value from input file...)
+void DFT::calculate_density_matrix() {
+    static const double alpha = 0.25; // mixing parameter alpha (NOTE: obtain this value from input file...)
     const unsigned int size = this->mol->get_nr_bfs(); // nr of cgfs
 
     MatrixXXd F = this->H + 2.0 * this->J + this->XC;
@@ -309,7 +316,6 @@ void DFT::calculate_density_matrix(bool sort) {
 
     // compute eigenvectors and eigenvalues
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(Fp);
-    // Eigen::MatrixXd D = es.eigenvalues().real().asDiagonal();
     this->Cc = es.eigenvectors().real();
 
     // obtain true coefficient matrix using the transformation matrix
@@ -319,7 +325,7 @@ void DFT::calculate_density_matrix(bool sort) {
     for(unsigned int i=0; i<size; i++) {
         for(unsigned int j=0; j<size; j++) {
             for(unsigned int k=0; k < this->nelec / 2; k++) {
-                Pnew(i,j) += 2.0 * C(i,k) * C(j,k);
+                Pnew(i,j) += C(i,k) * C(j,k);
             }
         }
     }
@@ -331,8 +337,8 @@ void DFT::calculate_density_matrix(bool sort) {
         this->P = (1.0 - alpha) * Pnew + alpha * P;
     }
 
+    // set the new density
     this->molgrid->set_density(P);
-    this->molgrid->renormalize_density(this->nelec);
 }
 
 /**
@@ -345,31 +351,13 @@ void DFT::calculate_density_matrix(bool sort) {
  * @return void
  */
 void DFT::calculate_electronic_repulsion_matrix() {
-    const unsigned int size = this->mol->get_nr_bfs();
-
-    // Populate two-electron repulsion matrix
-    #ifdef HAS_OPENMP
-    #pragma omp parallel for collapse(2)
-    #endif
-    for(unsigned int i=0; i<size; i++) {
-        for(unsigned int j=0; j<size; j++) {
-            this->J(i,j) = 0.; /* reset J matrix */
-            for(unsigned int k=0; k<size; k++) {
-                for(unsigned int l=0; l<size; l++) {
-                    const unsigned int index = integrator->teindex(i,j,k,l);
-
-                    // Exchange in Hartree-Fock
-                    //const unsigned int index2 = integrator->teindex(i,k,l,j);
-                    //this->J(i,j) += P(k,l) * (ints(index) - 0.5 * ints(index2));
-
-                    // I still don't understand why I need to put a 0.5 here... (see also the function below)
-                    // Does it have anything to do how I construct the density matrix P?
-                    // Can someone who knows the answer send me an e-mail?
-
-                    this->J(i,j) += 0.5 * P(k,l) * ints(index);
-                }
-            }
-        }
+    switch(this->hartree_evaluation_method) {
+        case DFT::BECKE_GRID:
+            this->calculate_hartree_potential_becke_poisson();
+        break;
+        case DFT::TWO_ELECTRON_INTEGRALS:
+            this->calculate_hartree_potential_te_int();
+        break;
     }
 }
 
@@ -414,8 +402,8 @@ void DFT::calculate_exchange_correlation_matrix() {
     for(unsigned int i=0; i<this->cgfs->size(); i++) {
         VectorXd row = amplitudes.row(i);
         VectorXd wva_i = wva.cwiseProduct(row);
-        for(unsigned int j=i; j<this->cgfs->size(); j++) {
-            this->XC(i,j) = this->XC(j,i) = wva_i.dot(amplitudes.row(j));
+        for(unsigned int j=0; j<this->cgfs->size(); j++) {
+            this->XC(i,j) = wva_i.dot(amplitudes.row(j));
         }
     }
 }
@@ -427,9 +415,46 @@ void DFT::calculate_exchange_correlation_matrix() {
  * @return void
  */
 void DFT::calculate_energy() {
-    this->single_electron_energy = (this->P * this->H).trace();
-    this->electronic_repulsion = (this->P * this->J).trace();
+    this->single_electron_energy = 2.0 * (this->P * this->H).trace();
+    this->electronic_repulsion = 2.0 * (this->P * this->J).trace();
 
     // sum all terms
     this->et = this->single_electron_energy + this->electronic_repulsion + this->enuc + this->exc;
+}
+
+/**
+ * @brief      Calculates the hartree potential from two electrons integrals
+ */
+void DFT::calculate_hartree_potential_te_int() {
+    const unsigned int size = this->mol->get_nr_bfs();
+
+    // Populate two-electron repulsion matrix
+    #pragma omp parallel for collapse(2)
+    for(unsigned int i=0; i<size; i++) {
+        for(unsigned int j=0; j<size; j++) {
+            this->J(i,j) = 0.; /* reset J matrix */
+            for(unsigned int k=0; k<size; k++) {
+                for(unsigned int l=0; l<size; l++) {
+                    const unsigned int index = integrator->teindex(i,j,k,l);
+
+                    // Exchange in Hartree-Fock
+                    //const unsigned int index2 = integrator->teindex(i,k,l,j);
+                    //this->J(i,j) += P(k,l) * (ints(index) - 0.5 * ints(index2));
+
+                    // I still don't understand why I need to put a 0.5 here... (see also the function below)
+                    // Does it have anything to do how I construct the density matrix P?
+                    // Can someone who knows the answer send me an e-mail?
+
+                    this->J(i,j) += P(k,l) * ints(index);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief      Calculates the hartree potential over Becke grid using Poisson equation
+ */
+void DFT::calculate_hartree_potential_becke_poisson() {
+    this->J = this->molgrid->calculate_hartree_potential();
 }

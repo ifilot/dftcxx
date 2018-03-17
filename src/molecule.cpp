@@ -1,7 +1,7 @@
 /**************************************************************************
- *   molecule.cpp  --  This file is part of DFTCXX.                       *
+ *   This file is part of DFTCXX.                                         *
  *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
  *                                                                        *
  *   DFTCXX is free software:                                             *
  *   you can redistribute it and/or modify it under the terms of the      *
@@ -20,6 +20,12 @@
  **************************************************************************/
 
 #include "molecule.h"
+
+Atom::Atom() :
+    atnr(0),
+    position(vec3(0,0,0))
+{
+}
 
 Atom::Atom(unsigned int _atnr, const vec3& _position):
     atnr(_atnr),
@@ -81,6 +87,16 @@ void Molecule::read_molecule_from_file(const std::string& filename) {
 
     this->set_basis_set(basis_set);
     std::cout << "========================================" << std::endl;
+
+    for(unsigned int i=0; i<nratoms; i++) {
+        std::cout << boost::format("%i  %12.6f  %12.6f  %12.6f")
+                     % this->atoms[i]->get_charge()
+                     % this->atoms[i]->get_position()[0]
+                     % this->atoms[i]->get_position()[1]
+                     % this->atoms[i]->get_position()[2] << std::endl;
+    }
+
+    std::cout << "========================================" << std::endl;
     std::cout << std::endl;
 }
 
@@ -92,7 +108,7 @@ void Molecule::set_basis_set(const std::string& basis_set) {
     // set information
     unsigned int highest_atom = 0;
     for(unsigned int i=0; i<this->atoms.size(); i++) {
-        highest_atom = std::max(highest_atom, this->atoms[i].get_charge());
+        highest_atom = std::max(highest_atom, this->atoms[i]->get_charge());
     }
 
     // open the file
@@ -168,9 +184,9 @@ void Molecule::set_basis_set(const std::string& basis_set) {
 
         // add basis functions to the atoms
         for(unsigned int i=0; i<this->atoms.size(); i++) {
-            if(this->atoms[i].get_charge() == atnr) {
+            if(this->atoms[i]->get_charge() == atnr) {
                 for(unsigned int j=0; j<bs_cgfs.size(); j++) {
-                    bs_cgfs[j].set_position(this->atoms[i].get_position());
+                    bs_cgfs[j].set_position(this->atoms[i]->get_position());
                     this->add_cgf(i, bs_cgfs[j]);
                 }
             }
@@ -188,7 +204,7 @@ unsigned int Molecule::get_nr_elec() const {
     unsigned int nr_elec = 0;
 
     for(unsigned int i=0; i<this->atoms.size(); i++) {
-        nr_elec += this->atoms[i].get_charge();
+        nr_elec += this->atoms[i]->get_charge();
     }
 
     return nr_elec;
@@ -218,6 +234,15 @@ unsigned int Molecule::get_atom_number_from_string(std::string el) {
     }
     if(el.compare("O") == 0) {
         return 8;
+    }
+    if(el.compare("F") == 0) {
+        return 9;
+    }
+    if(el.compare("Ne") == 0) {
+        return 10;
+    }
+    if(el.compare("Ar") == 0) {
+        return 18;
     }
 
     return 0;

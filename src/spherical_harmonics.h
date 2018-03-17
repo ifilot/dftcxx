@@ -19,45 +19,24 @@
  *                                                                        *
  **************************************************************************/
 
-#ifndef _FUNCTIONALS_H
-#define _FUNCTIONALS_H
+#ifndef _SPHERICAL_HARMONIC_H
+#define _SPHERICAL_HARMONIC_H
 
-#include <Eigen/Dense>
+#include <cmath>
 #include <boost/math/special_functions/factorials.hpp>
 
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
+namespace SH {
+    double spherical_harmonic(int l, int m, double pole, double azimuth);
 
-class Functional {
-public:
-    Functional();
+    double prefactor_spherical_harmonic(int l, int m);
 
-    // functionals
-    void xalpha_x_functional(const VectorXd& densitiesa,
-                             const VectorXd& densitiesb,
-                             VectorXd& ex,
-                             VectorXd& vxa,
-                             VectorXd& vxb);
+    double polar_function(int l, int m, double theta);
 
-    void vwm_c_functional(const VectorXd& densitiesa,
-                          const VectorXd& densitiesb,
-                          VectorXd& ec,
-                          VectorXd& vca,
-                          VectorXd& vcb);
+    double azimuthal_function(int m, double phi);
 
-private:
-    static constexpr double pi = 3.14159265358979323846;
+    double legendre (int n, double x);
 
-    // auxiliary functions
-    double vwn_xx(double x, double b, double c);
-    double vwn_epsp(double x);
-    double vwn_epsf(double x);
-    double vwn_eps(double x, double a, double x0, double b, double c);
-    double vwn_depsp(double x);
-    double vwn_depsf(double x);
-    double vwn_deps(double x, double a, double x0, double b, double c);
-    double vwn_g(double z);
-    double vwn_dg(double z);
+    double legendre_p (int n, int m, double x);
 };
 
-#endif //_FUNCTIONALS_H
+#endif // _SPHERICAL_HARMONIC_H

@@ -1,7 +1,7 @@
 /**************************************************************************
- *   moleculargrid.h  --  This file is part of DFTCXX.                    *
+ *   This file is part of DFTCXX.                                         *
  *                                                                        *
- *   Copyright (C) 2016, Ivo Filot                                        *
+ *   Author: Ivo Filot <ivo@ivofilot.nl>                                  *
  *                                                                        *
  *   DFTCXX is free software:                                             *
  *   you can redistribute it and/or modify it under the terms of the      *
@@ -22,184 +22,12 @@
 #ifndef _MOLECULAR_GRID_H
 #define _MOLECULAR_GRID_H
 
-#ifdef HAS_OPENMP
-#include <mutex>
-#endif
-
-#include <Eigen/Dense>
 #include <boost/math/special_functions/factorials.hpp>
+#include <cmath>
 
 #include "molecule.h"
-#include "quadrature.h"
-
-#include "bragg.h"
-
-typedef Eigen::Vector3d vec3;
-typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
-
-/*
- * @class GridPoint
- * @brief Represents a point in the molecular grid
- *
- * Grid point at position r; stores local information such as the amplitude
- * of all the basis functions in the basis set and the local density.
- *
- * Numerical integrations of any kind of property is conducted by
- * evaluating the local value of the functional at the grid point and
- * multiplying this by the weight of the grid point. Integration is then
- * performed by summing over all the grid points.
- *
- * The weights take into account:
- * - the Jacobian for integration into spherical coordinates
- * - the weight for the Lebedev integration (angular part)
- * - the weight for the Gauss-Chebyshev integration (radial part)
- * - the weight for the Becke grid (see: http://dx.doi.org/10.1063/1.454033)
- *
- */
-class GridPoint {
-public:
-    /**
-     * @fn DFT
-     * @brief DFT routine constructor
-     *
-     * @return DFT instance
-     */
-    GridPoint(const vec3& _r);
-
-    /*
-     * SETTERS
-     */
-
-     /**
-     * @fn set_weight
-     * @brief set the weight at the grid point
-     *
-     * @param _w      value of the weight
-     *
-     * @return void
-     */
-    inline void set_weight(double _w) {
-        this->w = _w;
-    }
-
-    /**
-     * @fn multiply_weight
-     * @brief multiply weight by factor at the grid point
-     *
-     * @param _w      weight multiplication factor
-     *
-     * @return void
-     */
-    inline void multiply_weight(double _w) {
-        this->w *= _w;
-    }
-
-    /**
-     * @fn set_atom
-     * @brief defines the atom to which this grid point is 'linked'
-     *
-     * @param at    pointer to Atom class
-     *
-     * @return void
-     */
-    inline void set_atom(const Atom* at) {
-        this->atom = at;
-    }
-
-    /**
-     * @fn set_basis_func_amp
-     * @brief calculates the amplitudes at the grid point of all basis functions
-     *
-     * @param _mol      pointer to the molecule object
-     *
-     * @return void
-     */
-    void set_basis_func_amp(const std::shared_ptr<Molecule>& _mol);
-
-    /**
-     * @fn set_density
-     * @brief calculates the density at the grid point using the density matrix
-     *
-     * @param _mol      reference to density matrix
-     *
-     * @return void
-     */
-    void set_density(const MatrixXXd& D);
-
-
-    /**
-     * @fn scale_density
-     *
-     * @brief multiplies density at gridpoint with factor
-     *
-     * @param factor multiplication factor
-     *
-     * @return void
-     */
-    void scale_density(double factor);
-
-    /*
-     * GETTERS
-     */
-
-     /**
-     * @fn get_position
-     * @brief get the position of the grid point
-     *
-     * @return vec3 position of the grid point
-     */
-    inline const vec3& get_position() const {
-        return this->r;
-    }
-
-    /**
-     * @fn get_atom_position
-     * @brief get the position of the atom to which this grid point is 'linked'
-     *
-     * @return vec3 position of the atom
-     */
-    inline const vec3& get_atom_position() const {
-        return this->atom->get_position();
-    }
-
-    /**
-     * @fn get_weight
-     * @brief get the weight of the grid point in the numerical integration
-     *
-     * @return double weight
-     */
-    inline const double get_weight() const {
-        return this->w;
-    }
-
-    /**
-     * @fn get_density
-     * @brief get the electron density at the grid point
-     *
-     * @return double density
-     */
-    inline const double get_density() const {
-        return this->density;
-    }
-
-    /**
-     * @fn get_basis_func_amp
-     * @brief get the amplitude of the basis functions
-     *
-     * @return (Eigen3) vector containing basis function amplitudes
-     */
-    inline const VectorXd& get_basis_func_amp() const {
-        return this->basis_func_amp;
-    }
-
-private:
-    const vec3 r;               // position in 3D space
-    double w;                   // weight
-    const Atom* atom;           // atom this gridpoint adheres to
-    VectorXd basis_func_amp;    // amplitude of basis functions at gridpoint
-    double density;             // current density at grid point
-};
+#include "gridpoint.h"
+#include "atomicgrid.h"
 
 /*
  * @class MolecularGrid
@@ -217,6 +45,32 @@ private:
  *
  */
 class MolecularGrid {
+private:
+    static constexpr double pi = 3.14159265358979323846;
+
+    std::shared_ptr<Molecule> mol;                                // pointer to molecule object
+
+    std::vector<std::unique_ptr<AtomicGrid>> atomic_grids;        // vector of pointers to atomic grids
+
+    std::vector<double> atomic_densities;
+
+    unsigned int angular_points;
+    unsigned int radial_points;
+    unsigned int lebedev_order;
+    unsigned int lebedev_offset;
+    int lmax;
+
+    // density coefficients (MXN) matrix where M are the radial points and N the combined lm index
+    MatrixXXd rho_lm;
+
+    // hartree potential coefficient (MXN) matrix where M are the radial points and N the combined lm index
+    MatrixXXd U_lm;
+
+    // vector holding radial distances
+    VectorXd r_n;
+
+    size_t grid_size;       //!< total grid size
+
 public:
     /**
      * @fn MolecularGrid
@@ -249,6 +103,36 @@ public:
     };
 
     /**
+     * @brief      Sets the grid fineness.
+     *
+     * @param[in]  fineness  fineness constant
+     */
+    void set_grid_fineness(unsigned int fineness);
+
+    /**
+     * @brief      Sets the grid parameters (fine-tuning)
+     *
+     * @param[in]  _radial_points  number of radial points
+     * @param[in]  _lebedev_order  The lebedev order
+     * @param[in]  _lmax           maximum angular momentum for spherical harmonics
+     */
+    void set_grid_parameters(unsigned int _radial_points, unsigned int _lebedev_order, unsigned int _lmax);
+
+    /**
+     * @fn create_grid
+     * @brief creates the molecular grid
+     *
+     * Creates a molecular grid given a set of atoms and a set of
+     * basis functions. For each atom, an atomic grid is created. The
+     * numerical integration is carried out over all the atomic grids. The
+     * contribution of the atomic grid to the overall integration over the
+     * whole molecule is controlled via a weight factor as defined by Becke.
+     *
+     * @return void
+     */
+    void create_grid();
+
+    /**
      * @fn set_density
      * @brief set the density at the grid point given a density matrix
      *
@@ -261,9 +145,12 @@ public:
      */
     void set_density(const MatrixXXd& P);
 
-    /*
-     *  vector & matrix getters
+    /**
+     * @brief      Calculates the hartree potential.
+     *
+     * @return     The hartree potential.
      */
+    MatrixXXd calculate_hartree_potential();
 
     /**
      * @fn get_weights
@@ -289,37 +176,7 @@ public:
      */
     MatrixXXd get_amplitudes() const;
 
-    /**
-     * @fn renormalize_density
-     * @brief normalize density at gridpoints so that sum equals all electrons
-     *
-     * @return void
-     */
-    void renormalize_density(unsigned int nr_elec);
-
 private:
-    static constexpr double pi = 3.14159265358979323846;
-
-    std::shared_ptr<Molecule> mol;  // pointer to molecule object
-
-    std::vector<GridPoint> grid;    // set of all gridpoints
-
-    /**
-     * @fn create_grid
-     * @brief creates the molecular grid
-     *
-     * @param fineness      ENUM (unsigned int) defining the resolution of the grid
-     *
-     * Creates a molecular grid given a set of atoms and a set of
-     * basis functions. For each atom, an atomic grid is created. The
-     * numerical integration is carried out over all the atomic grids. The
-     * contribution of the atomic grid to the overall integration over the
-     * whole molecule is controlled via a weight factor as defined by Becke.
-     *
-     * @return void
-     */
-    void create_grid(unsigned int fineness = GRID_MEDIUM);
-
     /**
      * @fn get_becke_weight_pn
      * @brief calculate Pn(r) (i.e. for a single gridpoint) for atom n (eq. 22 in A.D. Becke J.Chem.Phys. 88, 2547)
@@ -332,42 +189,13 @@ private:
      *
      * @return double Becke weight value
      */
-    double get_becke_weight_pn(unsigned int atnr, const vec3& p0);
-
-    /**
-     * @brief      Gets a correction factor for the Becke mu
-     *
-     * @param[in]  at1   atomic number of atom 1
-     * @param[in]  at2   atomic number of atom 2
-     * @param[in]  mu    Becke weight value
-     *
-     * @return     mu correction factor
-     */
-    double get_becke_mu_correction_hetero_atoms(unsigned int at1, unsigned int at2, double mu);
+    double get_becke_weight_pn(unsigned int i, const vec3& p0);
 
     /*
      * auxiliary functions for the Becke grid
      */
 
-    /**
-     * @fn cutoff
-     * @brief calculates the Becke weight
-     *
-     * @param fineness      mu (elliptical coordinate)
-     *
-     * @return double Becke weight value
-     */
     double cutoff(double mu);
-
-    /**
-     * @fn fk
-     * @brief recursive function to have smooth overlapping atomic grids
-     *
-     * @param k     number of iterations
-     * @param mu    elliptical coordinate
-     *
-     * @return value
-     */
     double fk(unsigned int k, double mu);
 };
 
