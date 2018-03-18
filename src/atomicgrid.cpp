@@ -103,6 +103,21 @@ void AtomicGrid::set_density(const MatrixXXd& P) {
     for(unsigned int i=0; i<this->grid.size(); i++) {
         this->grid[i].set_density(P);
     }
+
+    this->density_cached = false;
+}
+
+/**
+ * @brief      correct the densities
+ *
+ * @param[in]  correction_factor  The correction factor
+ */
+void AtomicGrid::correct_density(double correction_factor) {
+    #pragma omp parallel for
+    for(unsigned int i=0; i<this->grid.size(); i++) {
+        this->grid[i].multiply_density(correction_factor);
+    }
+
     this->density_cached = false;
 }
 
@@ -538,21 +553,4 @@ void AtomicGrid::interpolate_sh_coeff() {
         this->splines.back().set_values(x,y);
         this->splines.back().generate_spline();
     }
-}
-
-/**
- * @brief      calculate lm index
- *
- * @param[in]  l     l quantum number
- * @param[in]  m     m quantum number
- *
- * @return     the lm index
- */
-unsigned int AtomicGrid::calculate_lm(unsigned int l, unsigned int m) {
-    unsigned int lm_idx = 0;
-    for(int i=0; i < l; i++) {
-        lm_idx += 2 * i + 1;
-    }
-
-    return lm_idx + l + m;
 }

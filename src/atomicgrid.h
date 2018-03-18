@@ -140,6 +140,13 @@ public:
     void set_density(const MatrixXXd& P);
 
     /**
+     * @brief      correct the densities
+     *
+     * @param[in]  correction_factor  The correction factor
+     */
+    void correct_density(double correction_factor);
+
+    /**
      * @fn get_weights
      * @brief get the weights of all the grid points as a vector
      *
@@ -262,7 +269,9 @@ private:
      *
      * @return     the lm index
      */
-    unsigned int calculate_lm(unsigned int l, unsigned int m);
+    inline unsigned int calculate_lm(unsigned int l, unsigned int m) {
+        return l * l + l + m;
+    }
 };
 
 #endif //_ATOMIC_GRID_H

@@ -127,6 +127,25 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
 }
 
 /**
+ * @brief      correct the densities to match the total number of electrons
+ */
+void MolecularGrid::correct_densities() {
+    double sum = 0.0;
+    double charge = 0.0;
+
+    for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+        sum += this->atomic_grids[i]->get_density();
+        charge += this->mol->get_atomic_charge(i);
+    }
+
+    double correction_factor = charge / sum;
+
+    for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+        this->atomic_grids[i]->correct_density(correction_factor);
+    }
+}
+
+/**
  * @fn calculate_density
  * @brief calculate the total electron density (number of electrons)
  *

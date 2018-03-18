@@ -161,6 +161,11 @@ public:
      */
     MatrixXXd get_amplitudes() const;
 
+    /**
+     * @brief      correct the densities to match the total number of electrons
+     */
+    void correct_densities();
+
 private:
     /**
      * @fn get_becke_weight_pn

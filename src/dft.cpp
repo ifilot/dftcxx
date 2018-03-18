@@ -357,6 +357,9 @@ void DFT::calculate_density_matrix() {
 
     // set the new density
     this->molgrid->set_density(P);
+
+    // correct density
+    this->molgrid->correct_densities();
 }
 
 /**

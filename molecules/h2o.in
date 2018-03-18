@@ -1,7 +1,7 @@
 name = water molecule
 basis = p631
 units = bohr
-hartree_evaluation = two_electron_integrals
+hartree_evaluation = becke_grid
 
 system:
 3
