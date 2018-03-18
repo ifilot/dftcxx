@@ -179,9 +179,7 @@ void DFT::construct_matrices() {
     this->P = MatrixXXd::Zero(size, size);
 
     // calculate values of matrix elements
-    #ifdef HAS_OPENMP
     #pragma omp parallel for schedule(dynamic)
-    #endif
     for(unsigned int i=0; i<this->cgfs->size(); i++) {
         for(unsigned int j=i; j<this->cgfs->size(); j++) {
             S(i,j) = S(j,i) = this->integrator->overlap(cgfs->at(i), cgfs->at(j));
@@ -203,7 +201,14 @@ void DFT::construct_matrices() {
     this->calculate_nuclear_repulsion();
 
     // calculate all two-electron integrals
-    this->calculate_two_electron_integrals();
+    if(this->settings->get_hartree_evaluation_method() == Settings::TWO_ELECTRON_INTEGRALS) {
+        auto start = std::chrono::system_clock::now(); //tic
+        std::cout << "Explicitly calculating two electron integrals... " << std::flush;
+        this->calculate_two_electron_integrals();
+        auto end = std::chrono::system_clock::now(); //toc
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        std::cout << boost::format("(%f ms)\n") % elapsed.count();
+    }
 
     // calculate transformation matrix from the overlap matrix
     this->calculate_transformation_matrix();
@@ -212,10 +217,7 @@ void DFT::construct_matrices() {
     this->calculate_density_matrix();
 
     // calculate the electronic repulsion matrix from the density
-    // matrix and the two-electron integrals
-    if(this->settings->get_hartree_evaluation_method() == Settings::TWO_ELECTRON_INTEGRALS) {
-        this->calculate_two_electron_integrals();
-    }
+    this->calculate_electronic_repulsion_matrix();
 
     // calculate the total energy of the molecule
     this->calculate_energy();

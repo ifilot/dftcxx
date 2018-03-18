@@ -1,6 +1,7 @@
 name = benzene molecule
-basis = sto3g
+basis = sto6g
 units = angstrom
+hartree_evaluation = becke_grid
 
 system:
 12

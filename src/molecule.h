@@ -207,6 +207,13 @@ public:
      */
     unsigned int get_nr_elec() const;
 
+    /**
+     * @brief      the total number of gtos in this molecule
+     *
+     * @return     total number of gtos
+     */
+    unsigned int get_nr_gtos() const;
+
 private:
 
     /**

@@ -123,6 +123,7 @@ void Molecule::read_molecule_from_file(const std::string& filename) {
     }
 
     std::cout << "========================================" << std::endl;
+    std::cout << "Total number of GTOs: " << this->get_nr_gtos() << std::endl;
     std::cout << std::endl;
 }
 
@@ -249,6 +250,21 @@ unsigned int Molecule::get_nr_elec() const {
     }
 
     return nr_elec;
+}
+
+/**
+ * @brief      the total number of gtos in this molecule
+ *
+ * @return     total number of gtos
+ */
+unsigned int Molecule::get_nr_gtos() const {
+    unsigned int sz = 0;
+
+    for(unsigned int i=0; i<this->cgfs.size(); i++) {
+        sz += this->cgfs[i].size();
+    }
+
+    return sz;
 }
 
 /**
