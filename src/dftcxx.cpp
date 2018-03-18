@@ -49,11 +49,8 @@ int main(int argc, char** argv) {
         std::cout << std::endl;
 
         auto start = std::chrono::system_clock::now();
-        auto mol = std::make_shared<Molecule>(input_filename);
 
-        DFT dft;
-        dft.add_molecule(mol);
-        dft.set_hartree_evaluation(DFT::BECKE_GRID);
+        DFT dft(input_filename);
         dft.scf();
 
         auto end = std::chrono::system_clock::now();

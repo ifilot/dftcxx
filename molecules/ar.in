@@ -1,5 +1,7 @@
-helium molecule
-basis/sto3g.dat
-angstrom
+name = Argon atom
+basis = sto3g
+units = angstrom
+
+system:
 1
 Ar         0.000000        0.000000        0.000000

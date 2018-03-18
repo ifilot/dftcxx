@@ -1,6 +1,9 @@
-hydrogen molecule
-basis/sto3g.dat
-angstrom
+name = hydrogen molecule
+basis = sto3g
+units = angstrom
+grid = ultrafine
+
+system:
 2
 H   0   0   -.36700000000000000000
 H   0   0    .36700000000000000000

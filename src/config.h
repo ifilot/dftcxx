@@ -23,9 +23,9 @@
 #define _CONFIG_H
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 0
-#define VERSION_MICRO 1
-#define VERSION "1.0.1"
+#define VERSION_MINOR 1
+#define VERSION_MICRO 0
+#define VERSION "1.1.0"
 
 static const std::string PROGRAM_VERSION(VERSION);
 static const unsigned int PROGRAM_VERSION_MAJOR = VERSION_MAJOR;

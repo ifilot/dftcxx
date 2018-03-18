@@ -38,3 +38,4 @@ bin/dftcxx
 *.chg
 
 build/*
+pyquante.log

@@ -1,6 +1,8 @@
-water molecule
-basis/sto3g.dat
-bohr
+name = water molecule
+basis = sto3g
+units = bohr
+
+system:
 3
 O     0.0000    0.0000    0.0000
 H     0.7570    0.5860    0.0000

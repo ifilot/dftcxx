@@ -28,8 +28,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules )
 
 # prepare configuration file
 SET(VERSION_MAJOR "1")
-SET(VERSION_MINOR "0")
-SET(VERSION_MICRO "1")
+SET(VERSION_MINOR "1")
+SET(VERSION_MICRO "0")
 configure_file(config.h.in ../src/config.h @ONLY)
 
 # Enable release build
@@ -66,7 +66,7 @@ SET (Boost_USE_STATIC_LIBS ON)
 SET (Boost_USE_STATIC_RUNTIME OFF)
 SET (BOOST_ALL_DYN_LINK OFF)
 
-find_package(Boost REQUIRED)
+find_package(Boost COMPONENTS regex iostreams filesystem REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(EIGEN eigen3 REQUIRED)
 pkg_check_modules(TCLAP tclap REQUIRED)
@@ -92,7 +92,7 @@ file(GLOB SOURCES "*.cpp")
 add_executable(dftcxx ${SOURCES})
 
 # Link libraries
-target_link_libraries(dftcxx)
+target_link_libraries(dftcxx ${Boost_LIBRARIES})
 
 ###
 # Installing

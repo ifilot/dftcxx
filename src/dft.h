@@ -32,6 +32,7 @@
 #include "moleculargrid.h"
 #include "integrals.h"
 #include "functionals.h"
+#include "settings.h"
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
@@ -42,6 +43,7 @@ private:
     std::unique_ptr<MolecularGrid> molgrid;     // pointer to molecular grid
     std::shared_ptr<Integrator> integrator;     // pointer to integrator class
     std::shared_ptr<Functional> functional;     // pointer to functional class
+    std::shared_ptr<Settings> settings;         // pointer to settings class
 
     const std::vector<CGF>* cgfs;               // pointer vector of Contracted Gaussian Functions
 
@@ -59,26 +61,17 @@ private:
     MatrixXXd J;        // two-electron (coulomb) repulsion matrix
     MatrixXXd XC;       // two-electron exchange-correlation matrix
 
-    unsigned int nelec; // number of electrons of the molecule
+    unsigned int nelec;             // number of electrons of the molecule
 
-    double exc;         // exchange correlation energy
-    double enuc;        // nuclear repulsion energy
-    double et;          // total energy
-    double single_electron_energy;
-    double electronic_repulsion;
+    double exc;                     // exchange correlation energy
+    double enuc;                    // nuclear repulsion energy
+    double et;                      // total energy
+    double single_electron_energy;  // total single electron energy 2*trace(P * H)
+    double electronic_repulsion;    // total electronic repulsion 2*trace(P * J)
 
-    bool is_first;      // whether this is the first iteration
-
-    unsigned int hartree_evaluation_method; //!< method of calculating hartree potential
+    bool is_first;                  // whether this is the first iteration
 
 public:
-
-    enum {
-        BECKE_GRID,
-        TWO_ELECTRON_INTEGRALS,
-
-        NUM_HARTEE_EVALUATION
-    };
 
     /**
      * @fn DFT
@@ -86,7 +79,20 @@ public:
      *
      * @return DFT instance
      */
-    DFT();
+    DFT(const std::string& filename);
+
+    /**
+     * @fn scf
+     * @brief perform the self-consistent field iterations
+     *
+     * @return void
+     */
+    void scf();
+
+private:
+    /*
+     * construction functions
+     */
 
     /**
      * @fn add_molecule
@@ -102,28 +108,6 @@ public:
      * @return void
      */
     void add_molecule(const std::shared_ptr<Molecule>& _mol);
-
-    /**
-     * @fn scf
-     * @brief perform the self-consistent field iterations
-     *
-     * @return void
-     */
-    void scf();
-
-    /**
-     * @brief      Sets the hartree evaluation.
-     *
-     * @param[in]  method  The method
-     */
-    inline void set_hartree_evaluation(unsigned int method) {
-        this->hartree_evaluation_method = method;
-    }
-
-private:
-    /*
-     * construction functions
-     */
 
     /**
      * @fn copy_cgfs_from_molecule

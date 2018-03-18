@@ -1,5 +1,7 @@
-helium molecule
-basis/sto3g.dat
-angstrom
+name = neon atom
+basis = sto3g
+units = angstrom
+
+system:
 1
 Ne         0.000000        0.000000        0.000000
