@@ -57,9 +57,11 @@ private:
     double w;                   // weight
     double w_becke;             // Fuzzy cell weight
     double density;             // current density at grid point
+    vec3 grad;                  // gradient
 
     const Atom* atom;           // atom this gridpoint adheres to
     VectorXd basis_func_amp;    // amplitude of basis functions at gridpoint
+    MatrixXXd basis_func_grad;  // gradient of basis functions at gridpoint
 
 public:
     /**
@@ -139,6 +141,16 @@ public:
     void set_basis_func_amp(const std::shared_ptr<Molecule>& _mol);
 
     /**
+     * @fn set_basis_func_grad
+     * @brief calculates the gradient at the grid point of all basis functions
+     *
+     * @param _mol      pointer to the molecule object
+     *
+     * @return void
+     */
+    void set_basis_func_grad(const std::shared_ptr<Molecule>& _mol);
+
+    /**
      * @fn set_density
      * @brief calculates the density at the grid point using the density matrix
      *
@@ -147,6 +159,16 @@ public:
      * @return void
      */
     void set_density(const MatrixXXd& D);
+
+    /**
+     * @fn set_gradient
+     * @brief calculates the gradient at the grid point using the density matrix
+     *
+     * @param _mol      reference to density matrix
+     *
+     * @return void
+     */
+    void set_gradient(const MatrixXXd& D);
 
     /*
      * GETTERS
@@ -200,6 +222,16 @@ public:
      */
     inline const double get_density() const {
         return this->density;
+    }
+
+    /**
+     * @fn get_gradient
+     * @brief get the electron density gradient at the grid point
+     *
+     * @return gradient
+     */
+    inline const vec3& get_gradient() const {
+        return this->grad;
     }
 
     /**

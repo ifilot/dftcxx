@@ -152,6 +152,16 @@ public:
     const double get_amp(const vec3& r) const;
 
     /*
+     * @fn get_gradient
+     * @brief Gets the gradient of the GTO
+     *
+     * @param vec3 r    coordinates
+     *
+     * @return gradient
+     */
+    vec3 get_grad(const vec3& r) const;
+
+    /*
      * @fn set_position
      * @brief Set (new) position of GTO
      *
@@ -265,6 +275,16 @@ public:
      * @return const double amplitude
      */
     const double get_amp(const vec3& r) const;
+
+    /*
+     * @fn get_amp
+     * @brief Gets the gradient of the CGF
+     *
+     * @param vec3 r    coordinates
+     *
+     * @return gradient
+     */
+    vec3 get_grad(const vec3& r) const;
 
     /*
      * @fn add_GTO

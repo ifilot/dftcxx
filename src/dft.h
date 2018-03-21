@@ -32,6 +32,7 @@
 #include "moleculargrid.h"
 #include "integrals.h"
 #include "functionals.h"
+#include "rectangulargrid.h"
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatrixXXd;
 typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
@@ -223,6 +224,11 @@ private:
      * @brief      Calculates the hartree potential over Becke grid using Poisson equation
      */
     void calculate_hartree_potential_becke_poisson();
+
+    /*
+     * @brief      Finalize calculation and store requested data
+     */
+    void finalize();
 };
 
 #endif //_DFT_H

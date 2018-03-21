@@ -131,6 +131,9 @@ void DFT::scf() {
         std::cout << "Stopping because energy criterion is reached." << std::endl;
         std::cout << std::endl;
     }
+
+    // output results
+    this->finalize();
 }
 
 /**
@@ -468,4 +471,14 @@ void DFT::calculate_hartree_potential_te_int() {
  */
 void DFT::calculate_hartree_potential_becke_poisson() {
     this->J = this->molgrid->calculate_hartree_potential();
+}
+
+/*
+ * @brief      Finalize calculation and store requested data
+ */
+void DFT::finalize() {
+    RectangularGrid rg(this->mol);
+    rg.build_grid(10.0, 100);
+    rg.set_density(this->P);
+    rg.write_density();
 }
