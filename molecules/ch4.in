@@ -1,6 +1,8 @@
-methane
-basis/sto6g.dat
-bohr
+name = methane
+basis = sto6g
+units = bohr
+
+system:
 5
 C  -0.213   0.154   0.000
 H  -0.213   2.304   0.000

@@ -1,5 +1,7 @@
-helium molecule
-basis/sto3g.dat
-angstrom
+name = Beryllium atom
+basis = sto3g
+units = angstrom
+
+system:
 1
 Be         0.000000        0.000000        0.000000

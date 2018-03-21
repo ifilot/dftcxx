@@ -119,6 +119,15 @@ public:
     }
 
     /**
+     * @brief      multiply density by correction factor
+     *
+     * @param[in]  _d    correction factor
+     */
+    inline void multiply_density(double _d) {
+        this->density *= _d;
+    }
+
+    /**
      * @fn set_atom
      * @brief defines the atom to which this grid point is 'linked'
      *

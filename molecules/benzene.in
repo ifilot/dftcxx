@@ -1,6 +1,9 @@
-benzene molecule
-basis/sto3g.dat
-angstrom
+name = benzene molecule
+basis = sto6g
+units = angstrom
+hartree_evaluation = becke_grid
+
+system:
 12
 C  0.000  1.396  0.000
 C  1.209  0.698  0.000

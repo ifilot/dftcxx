@@ -1,6 +1,8 @@
-nitrogen molecule
-basis/p631.dat
-angstrom
+name = nitrogen molecule
+basis = p631
+units = angstrom
+
+system:
 2
 N         0.000000        0.000000        0.000000
 N         0.000000        0.000000        1.097600

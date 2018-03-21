@@ -21,44 +21,70 @@
 
 #include "molecule.h"
 
+/**
+ * @brief      atom constructor
+ */
 Atom::Atom() :
     atnr(0),
     position(vec3(0,0,0))
 {
 }
 
+/**
+ * @brief      atom constructor
+ *
+ * @param[in]  atnr       atom number (i.e. number of protons)
+ * @param[in]  _position  atom position
+ */
 Atom::Atom(unsigned int _atnr, const vec3& _position):
     atnr(_atnr),
     position(_position) {
 }
 
-Molecule::Molecule(const std::string& filename) {
+/**
+ * @brief      molecule constructor
+ *
+ * @param[in]  filename   input file
+ * @param[in]  _settings  pointer to settings object
+ */
+Molecule::Molecule(const std::string& filename, const std::shared_ptr<Settings>& _settings) :
+settings(_settings)
+{
     this->read_molecule_from_file(filename);
 }
 
+/**
+ * @brief      Reads a molecule from file.
+ *
+ * @param[in]  filename  The filename
+ */
 void Molecule::read_molecule_from_file(const std::string& filename) {
     std::cout << "           Reading input file           " << std::endl;
     std::cout << "========================================" << std::endl;
 
     static const double angstrom_to_bohr = 1.889725989;
+    bool unit_angstrom;
+    try {
+        unit_angstrom = this->settings->get_value("units").compare("angstrom") == 0 ? true : false;
+    } catch(const std::exception& e) {
+        unit_angstrom = false;
+    }
 
     std::cout << "Reading file:\t\t" << filename << std::endl;
     std::cout << std::endl;
 
+    std::cout << "System name: " << this->settings->get_value("name") << std::endl;
+    std::string basis_set = "basis/" + this->settings->get_value("basis") + ".dat";
+    std::cout << "Basis set: " << basis_set << std::endl;
+    std::cout << std::endl;
+
+    // ignore all settings information
     std::ifstream infile(filename);
     std::string line;
-
-    std::getline(infile, line); // grab name
-    std::cout << "Calculating system:\t" << line << std::endl;
-
-    std::getline(infile, line); // grab basis set
-    std::string basis_set = line;
-    std::cout << "Using basis set:\t" << basis_set << std::endl;
-
-    bool unit_angstrom = false;
-    std::getline(infile, line); // length unit
-    if(line.compare("angstrom") == 0) {
-        unit_angstrom = true;
+    while(std::getline(infile, line)) {
+        if(line.substr(0,7).compare("system:") == 0) {
+            break;
+        }
     }
 
     std::getline(infile, line); // grab number of atoms
@@ -97,9 +123,15 @@ void Molecule::read_molecule_from_file(const std::string& filename) {
     }
 
     std::cout << "========================================" << std::endl;
+    std::cout << "Total number of GTOs: " << this->get_nr_gtos() << std::endl;
     std::cout << std::endl;
 }
 
+/**
+ * @brief      Sets the basis set.
+ *
+ * @param[in]  basis_set  The basis set
+ */
 void Molecule::set_basis_set(const std::string& basis_set) {
     // define origin vector
     static const vec3 origin(0,0,0);
@@ -112,6 +144,11 @@ void Molecule::set_basis_set(const std::string& basis_set) {
     }
 
     // open the file
+    if (!boost::filesystem::exists("../" + basis_set)) {
+        std::cerr << "Please make sure you are running dftcxx from the build directory..." << std::endl;
+        throw std::runtime_error("Cannot open ../" + basis_set + "!");
+    }
+
     std::ifstream infile("../" + basis_set);
     std::string line;
     std::vector<CGF> bs_cgfs;
@@ -200,6 +237,11 @@ void Molecule::set_basis_set(const std::string& basis_set) {
     infile.close();
 }
 
+/**
+ * @brief      Gets the number of elec.
+ *
+ * @return     The number of elec.
+ */
 unsigned int Molecule::get_nr_elec() const {
     unsigned int nr_elec = 0;
 
@@ -210,40 +252,37 @@ unsigned int Molecule::get_nr_elec() const {
     return nr_elec;
 }
 
-unsigned int Molecule::get_atom_number_from_string(std::string el) {
-    if(el.compare("H") == 0) {
-        return 1;
-    }
-    if(el.compare("He") == 0) {
-        return 2;
-    }
-    if(el.compare("Li") == 0) {
-        return 3;
-    }
-    if(el.compare("Be") == 0) {
-        return 4;
-    }
-    if(el.compare("B") == 0) {
-        return 5;
-    }
-    if(el.compare("C") == 0) {
-        return 6;
-    }
-    if(el.compare("N") == 0) {
-        return 7;
-    }
-    if(el.compare("O") == 0) {
-        return 8;
-    }
-    if(el.compare("F") == 0) {
-        return 9;
-    }
-    if(el.compare("Ne") == 0) {
-        return 10;
-    }
-    if(el.compare("Ar") == 0) {
-        return 18;
+/**
+ * @brief      the total number of gtos in this molecule
+ *
+ * @return     total number of gtos
+ */
+unsigned int Molecule::get_nr_gtos() const {
+    unsigned int sz = 0;
+
+    for(unsigned int i=0; i<this->cgfs.size(); i++) {
+        sz += this->cgfs[i].size();
     }
 
-    return 0;
+    return sz;
+}
+
+/**
+ * @brief      Gets the atom number from string.
+ *
+ * @param[in]  el    element name
+ *
+ * @return     atom number
+ */
+unsigned int Molecule::get_atom_number_from_string(std::string el) {
+    static const std::vector<std::string> names = {"H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na",
+                                                   "Mg", "Al", "Si", "P", "S", "Cl", "Ar"};
+
+    for(unsigned int i=0; i<names.size(); i++) {
+        if(names[i].compare(el) == 0) {
+            return (i+1);
+        }
+    }
+
+    throw std::runtime_error("Unknown element: " + el);
 }

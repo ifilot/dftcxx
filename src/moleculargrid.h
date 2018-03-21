@@ -24,6 +24,7 @@
 
 #include <boost/math/special_functions/factorials.hpp>
 #include <cmath>
+#include <chrono>
 
 #include "molecule.h"
 #include "gridpoint.h"
@@ -93,22 +94,6 @@ public:
      */
     double calculate_density() const;
 
-    enum {  // defines fineness of the numerical integration
-        GRID_COARSE,
-        GRID_MEDIUM,
-        GRID_FINE,
-        GRID_ULTRAFINE,
-
-        NR_GRID_RESOLUTIONS
-    };
-
-    /**
-     * @brief      Sets the grid fineness.
-     *
-     * @param[in]  fineness  fineness constant
-     */
-    void set_grid_fineness(unsigned int fineness);
-
     /**
      * @brief      Sets the grid parameters (fine-tuning)
      *
@@ -175,6 +160,11 @@ public:
      * @return matrix (basis functions x grid points)
      */
     MatrixXXd get_amplitudes() const;
+
+    /**
+     * @brief      correct the densities to match the total number of electrons
+     */
+    void correct_densities();
 
 private:
     /**

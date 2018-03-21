@@ -1,6 +1,8 @@
-carbon monoxide
-basis/sto3g.dat
-bohr
+name = carbon monoxide
+basis = sto3g
+units = bohr
+
+system:
 2
 C   0   0   0
 O   0   0   2.116

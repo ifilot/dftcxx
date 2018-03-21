@@ -127,6 +127,25 @@ MatrixXXd MolecularGrid::get_amplitudes() const {
 }
 
 /**
+ * @brief      correct the densities to match the total number of electrons
+ */
+void MolecularGrid::correct_densities() {
+    double sum = 0.0;
+    double charge = 0.0;
+
+    for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+        sum += this->atomic_grids[i]->get_density();
+        charge += this->mol->get_atomic_charge(i);
+    }
+
+    double correction_factor = charge / sum;
+
+    for(unsigned int i=0; i<this->atomic_grids.size(); i++) {
+        this->atomic_grids[i]->correct_density(correction_factor);
+    }
+}
+
+/**
  * @fn calculate_density
  * @brief calculate the total electron density (number of electrons)
  *
@@ -144,42 +163,6 @@ double MolecularGrid::calculate_density() const {
     }
 
     return sum;
-}
-
-/**
- * @brief      Sets the grid fineness.
- *
- * @param[in]  fineness  fineness constant
- */
-void MolecularGrid::set_grid_fineness(unsigned int fineness) {
-    // set the resolution of the grid
-    switch(fineness) {
-        case GRID_COARSE:
-            this->radial_points = 10;
-            this->lebedev_order = Quadrature::LEBEDEV_50;
-            this->lmax = 5;
-        break;
-        case GRID_MEDIUM:
-            this->radial_points = 15;
-            this->lebedev_order = Quadrature::LEBEDEV_110;
-            this->lmax = 8;
-        break;
-        case GRID_FINE:
-            this->radial_points = 20;
-            this->lebedev_order = Quadrature::LEBEDEV_146;
-            this->lmax = 10;
-        break;
-        case GRID_ULTRAFINE:
-            this->radial_points = 30;
-            this->lebedev_order = Quadrature::LEBEDEV_194;
-            this->lmax = 11;
-        break;
-        default: // medium settings
-            this->radial_points = 15;
-            this->lebedev_order = Quadrature::LEBEDEV_110;
-            this->lmax = 8;
-        break;
-    }
 }
 
 /**
@@ -208,6 +191,15 @@ void MolecularGrid::set_grid_parameters(unsigned int _radial_points, unsigned in
  * @return void
  */
 void MolecularGrid::create_grid() {
+
+    auto start = std::chrono::system_clock::now(); //tic
+
+    std::cout << "      Constructing molecular grid       " << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Number of radial points: " << this->radial_points << std::endl;
+    std::cout << "Lebedev order: " << this->lebedev_order << std::endl;
+    std::cout << "Lmax value: " << this->lmax << std::endl;
+
     // calculate number of angular points
     this->angular_points = Quadrature::num_lebedev_points[this->lebedev_order];
 
@@ -260,6 +252,12 @@ void MolecularGrid::create_grid() {
 
         this->atomic_grids[i]->set_becke_weights(becke_weight_coeff);
     }
+
+    auto end = std::chrono::system_clock::now(); //toc
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    std::cout << boost::format("Total time: %f ms\n") % elapsed.count();
+    std::cout << "========================================" << std::endl;
+    std::cout << std::endl;
 }
 
 /**
