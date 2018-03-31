@@ -25,6 +25,7 @@
 
 #include "molecule.h"
 #include "dft.h"
+#include "conjugate_gradient.h"
 #include "config.h"
 
 int main(int argc, char** argv) {
@@ -50,8 +51,16 @@ int main(int argc, char** argv) {
 
         auto start = std::chrono::system_clock::now();
 
-        DFT dft(input_filename);
-        dft.scf();
+        // load settings and molecule from filename
+        auto settings = std::make_shared<Settings>(input_filename);
+        auto mol = std::make_shared<Molecule>(input_filename, settings);
+
+        // construct dft object
+        auto dft = std::make_shared<DFT>(mol, settings);
+
+        // construct conjugate gradient optimizer
+        auto cgo = std::make_shared<ConjugateGradient>(dft);
+        cgo->optimize();
 
         auto end = std::chrono::system_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

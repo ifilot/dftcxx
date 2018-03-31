@@ -146,7 +146,7 @@ void MolecularGrid::correct_densities() {
 }
 
 /**
- * @brief      get the forces on the atom
+ * @brief      calculate the Hellmann-Feynman forces
  *
  * @return     atomic forces
  */

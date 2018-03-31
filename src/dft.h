@@ -61,6 +61,7 @@ private:
     MatrixXXd P;        // density matrix
     MatrixXXd J;        // two-electron (coulomb) repulsion matrix
     MatrixXXd XC;       // two-electron exchange-correlation matrix
+    MatrixXXd F;        // Hellmann-Feyman forces
 
     unsigned int nelec;             // number of electrons of the molecule
 
@@ -75,12 +76,12 @@ private:
 public:
 
     /**
-     * @fn DFT
-     * @brief DFT routine constructor
+     * @brief      default constructor
      *
-     * @return DFT instance
+     * @param[in]  _mol       molecule
+     * @param[in]  _settings  settings
      */
-    DFT(const std::string& filename);
+    DFT(const std::shared_ptr<Molecule>& _mol, const std::shared_ptr<Settings>& _settings);
 
     /**
      * @fn scf
@@ -88,7 +89,28 @@ public:
      *
      * @return void
      */
-    void scf();
+    void scf(bool verbose = false);
+
+    /**
+     * @brief      get the force vector
+     */
+    VectorXd get_force_vector();
+
+    /**
+     * @brief      get the total energy of the molecule
+     *
+     * @return     The energy.
+     */
+    inline double get_energy() {
+        return this->et;
+    }
+
+    /**
+     * @brief      perturb atoms of molecule
+     *
+     * @param[in]  p     perturbation vector
+     */
+    void perturb_atoms(const VectorXd& p);
 
 private:
     /*
@@ -208,6 +230,13 @@ private:
      * @brief      Calculates the hartree potential over Becke grid using Poisson equation
      */
     void calculate_hartree_potential_becke_poisson();
+
+    /**
+     * @brief      Calculate the hellmann feynman forces.
+     */
+    inline void calculate_hellmann_feynman_forces() {
+        this->F = this->molgrid->get_forces_atoms();
+    }
 
     /*
      * @brief      Finalize calculation and store requested data

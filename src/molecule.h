@@ -72,6 +72,15 @@ public:
         return this->atnr;
     }
 
+    /**
+     * @brief      set new position
+     *
+     * @param[in]  pos   position
+     */
+    inline void set_position(const vec3& pos) {
+        this->position = pos;
+    }
+
 private:
     unsigned int atnr;      // atomic number
     vec3 position;          // atom position

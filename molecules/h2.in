@@ -1,9 +1,9 @@
 name = hydrogen molecule
-basis = p321
+basis = p631
 units = angstrom
 grid = ultrafine
 
 system:
 2
-H   0   0   -.43000
-H   0   0    .43000
+H   0   0   -.5000
+H   0   0    .5000

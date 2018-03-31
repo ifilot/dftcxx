@@ -22,17 +22,15 @@
 #include "dft.h"
 
 /**
- * @fn DFT
- * @brief DFT routine constructor
+ * @brief      default constructor
  *
- * @return DFT instance
+ * @param[in]  _mol       molecule
+ * @param[in]  _settings  settings
  */
-DFT::DFT(const std::string& filename) {
+DFT::DFT(const std::shared_ptr<Molecule>& _mol, const std::shared_ptr<Settings>& _settings) :
+settings(_settings) {
     is_first = true;
-    this->settings = std::make_shared<Settings>(filename);
-    this->mol = std::make_shared<Molecule>(filename, this->settings);
-
-    this->add_molecule(this->mol);
+    this->add_molecule(_mol);
 }
 
 /**
@@ -64,12 +62,12 @@ void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
     this->copy_cgfs_from_molecule();
 
     std::cout << "Loading molecule and constructing matrices." << std::endl;
-    auto start = std::chrono::system_clock::now(); //tic
+    auto start = std::chrono::system_clock::now();
 
     // construct all matrices
     this->construct_matrices();
 
-    auto end = std::chrono::system_clock::now(); //toc
+    auto end = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     std::cout << boost::format("Total time: %f ms\n") % elapsed.count();
     std::cout << std::endl;
@@ -81,13 +79,16 @@ void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
  *
  * @return void
  */
-void DFT::scf() {
+void DFT::scf(bool verbose) {
     static const unsigned int max_iterations = 100;
 
-    std::cout << "          Starting calculation          " << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "  #        energy    elec" << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
+    if(verbose) {
+        std::cout << "          Starting calculation          " << std::endl;
+        std::cout << "========================================" << std::endl;
+        std::cout << "  #        energy    elec" << std::endl;
+        std::cout << "----------------------------------------" << std::endl;
+    }
+
     double old_energy = this->et;
     double difference = 1.0;
     unsigned int iteration = 0;
@@ -105,25 +106,34 @@ void DFT::scf() {
         auto end = std::chrono::system_clock::now(); //toc
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-        std::cout << boost::format("%3i    %9.7f    %4.2f (%3i) \n")
-                            % iteration
-                            % this->et
-                            % this->molgrid->calculate_density()
-                            % this->nelec;
-
-        std::cout << boost::format("\tE_XC \t= %9.7f\n\tE_NUC \t= %9.7f\n\tE_ONE \t= %9.7f\n\tE_J \t= %9.7f\n\tt \t=%9.7f ms\n")
-                            % this->exc
-                            % this->enuc
-                            % this->single_electron_energy
-                            % this->electronic_repulsion
-                            % (elapsed.count());
-
-        std::cout << "----------------------------------------" << std::endl;
-
         difference = std::abs(this->et - old_energy);
         old_energy = this->et;
 
-        if(iteration >= max_iterations) {
+        if(verbose) {
+            std::cout << boost::format("%3i    %9.7f    %4.2f (%3i) \n")
+                                % iteration
+                                % this->et
+                                % this->molgrid->calculate_density()
+                                % this->nelec;
+
+            std::cout << boost::format("\tE_XC \t= %9.7f\n\tE_NUC \t= %9.7f\n\tE_ONE \t= %9.7f\n\tE_J \t= %9.7f\n\tt \t=%9.7f ms\n")
+                                % this->exc
+                                % this->enuc
+                                % this->single_electron_energy
+                                % this->electronic_repulsion
+                                % (elapsed.count());
+
+            std::cout << "----------------------------------------" << std::endl;
+        } else {
+            std::cout << boost::format("%4i | %12.8f | %12.8f | %4.1f ms")
+                                % iteration
+                                % this->et
+                                % difference
+                                % (elapsed.count());
+            std::cout << std::endl;
+        }
+
+        if(iteration >= max_iterations && verbose) {
             std::cout << "========================================" << std::endl;
             std::cout << "Stopping because maximum number of iterations has been reached." << std::endl;
             std::cout << std::endl;
@@ -131,14 +141,40 @@ void DFT::scf() {
         }
     }
 
-    if(iteration < max_iterations) {
+    if(iteration < max_iterations && verbose) {
         std::cout << "========================================" << std::endl;
         std::cout << "Stopping because energy criterion is reached." << std::endl;
         std::cout << std::endl;
     }
 
+    this->calculate_hellmann_feynman_forces();
+
     // output results
     this->finalize();
+}
+
+/**
+ * @brief      perturb atoms of molecule
+ *
+ * @param[in]  p     perturbation vector
+ */
+void DFT::perturb_atoms(const VectorXd& p) {
+    for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
+        vec3 newpos = this->mol->get_atom(i)->get_position();
+        for(unsigned int j=0; j<3; j++) {
+            newpos[j] += p[i*3 + j];
+        }
+        this->mol->get_atom(i)->set_position(newpos);
+    }
+}
+
+/**
+ * @brief      get the force vector
+ */
+VectorXd DFT::get_force_vector() {
+    auto Ft = F;
+    Ft.transposeInPlace();
+    return Eigen::Map<VectorXd>(Ft.data(), Ft.cols() * Ft.rows());
 }
 
 /**
@@ -487,20 +523,4 @@ void DFT::calculate_hartree_potential_becke_poisson() {
  * @brief      Finalize calculation and store requested data
  */
 void DFT::finalize() {
-
-    // needs to be connected to interface
-
-    // // build rectangular grid
-    // RectangularGrid rg(this->mol);
-
-    // // create grid points
-    // rg.build_grid(5.0, 15);
-
-    // // set the density
-    // rg.set_density(this->P);
-
-    // // write the grid to a file
-    // rg.write_gradient("data.dat");
-
-    std::cout << this->molgrid->get_forces_atoms() << std::endl;
 }

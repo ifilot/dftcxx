@@ -28,8 +28,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules )
 
 # prepare configuration file
 SET(VERSION_MAJOR "1")
-SET(VERSION_MINOR "1")
-SET(VERSION_MICRO "2")
+SET(VERSION_MINOR "2")
+SET(VERSION_MICRO "0")
 configure_file(config.h.in ../src/config.h @ONLY)
 
 # Enable release build
