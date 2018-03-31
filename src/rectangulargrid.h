@@ -55,7 +55,12 @@ public:
      */
     void set_density(const MatrixXXd& P);
 
-    void write_density();
+    /**
+     * @brief      write the gradient to a data file
+     *
+     * @param[in]  filename  path to data file
+     */
+    void write_gradient(const std::string& filename);
 
 private:
 };

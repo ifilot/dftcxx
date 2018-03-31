@@ -67,10 +67,12 @@ const double GTO::get_amp(const vec3& r) const {
 vec3 GTO::get_grad(const vec3& r) const {
     const double ex = std::exp(-this->alpha * std::pow(r[0]-this->position[0],2));
     const double fx = std::pow(r[0] - this->position[0], this->l) * ex;
+
     const double ey = std::exp(-this->alpha * std::pow(r[1]-this->position[1],2));
-    const double fy = std::pow(r[1] - this->position[0], this->m) * ey;
+    const double fy = std::pow(r[1] - this->position[1], this->m) * ey;
+
     const double ez = std::exp(-this->alpha * std::pow(r[2]-this->position[2],2));
-    const double fz = std::pow(r[2] - this->position[0], this->n) * ez;
+    const double fz = std::pow(r[2] - this->position[2], this->n) * ez;
 
     double gx = -2.0 * this->alpha * (r[0]-this->position[0]) * fx;
     double gy = -2.0 * this->alpha * (r[1]-this->position[1]) * fy;

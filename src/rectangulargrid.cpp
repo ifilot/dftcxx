@@ -42,8 +42,14 @@ void RectangularGrid::build_grid(double size, unsigned int dp) {
                 vec3 pos((double)k * gdsize - size / 2.0,
                          (double)j * gdsize - size / 2.0,
                          (double)i * gdsize - size / 2.0);
+
+                // add new grid point
                 this->grid.emplace_back(pos, ctr);
+
+                // set basis function amplitude
                 this->grid.back().set_basis_func_amp(mol);
+
+                // set basis function gradient
                 this->grid.back().set_basis_func_grad(mol);
             }
         }
@@ -68,32 +74,22 @@ void RectangularGrid::set_density(const MatrixXXd& P) {
     }
 }
 
-void RectangularGrid::write_density() {
-    std::vector<uint8_t> buffer(this->gridsize * this->gridsize * 4, 0);
+/**
+ * @brief      write the gradient to a data file
+ *
+ * @param[in]  filename  path to data file
+ */
+void RectangularGrid::write_gradient(const std::string& filename) {
+    std::ofstream out(filename);
 
-    for(unsigned int i=0; i<this->gridsize; i++) {
-        for(unsigned int j=0; j<this->gridsize; j++) {
-            const unsigned int idx = i * this->gridsize * this->gridsize + (gridsize/2) * gridsize + j;
+    for(unsigned int i=0; i<this->grid.size(); i++) {
 
-            vec3 grad = this->grid[idx].get_gradient();
-            double valx = (std::log10(std::abs(grad[0])) + 5) * 255.0;
-            double valy = (std::log10(std::abs(grad[1])) + 5) * 255.0;
-            double valz = (std::log10(std::abs(grad[2])) + 5) * 255.0;
+        const vec3& pos = this->grid[i].get_position();
+        const vec3& grad = this->grid[i].get_gradient();
 
-            const unsigned int canvas_idx = i * this->gridsize + j;
-            valx = std::max(0.0, valx);
-            valx = std::min(255.0, valx);
-            valy = std::max(0.0, valy);
-            valy = std::min(255.0, valy);
-            valz = std::max(0.0, valz);
-            valz = std::min(255.0, valz);
-
-            buffer[canvas_idx * 4] = (uint8_t)valx;
-            buffer[canvas_idx * 4 + 1] = (uint8_t)valy;
-            buffer[canvas_idx * 4 + 2] = (uint8_t)valz;
-            buffer[canvas_idx * 4 + 3] = 255;
-        }
+        out << boost::format("%12.8f  %12.8f  %12.8f  %12.8f  %12.8f  %12.8f\n")
+                % pos[0] % pos[1] % pos[2] % grad[0] % grad[1] % grad[2];
     }
 
-    PNG::write_image_buffer_to_png("test.png", buffer, this->gridsize, this->gridsize, PNG_COLOR_TYPE_RGBA);
+    out.close();
 }

@@ -96,9 +96,13 @@ void GridPoint::set_gradient(const MatrixXXd& D) {
     VectorXd y = this->basis_func_grad.col(1);
     VectorXd z = this->basis_func_grad.col(2);
 
-    double gx = 2.0 * x.dot(D * x);
-    double gy = 2.0 * y.dot(D * y);
-    double gz = 2.0 * z.dot(D * z);
+    // apply product rule for the gradient
+    double gx = 2.0 * this->basis_func_amp.transpose().dot(D * x) +
+                2.0 * x.transpose().dot(D * this->basis_func_amp);
+    double gy = 2.0 * this->basis_func_amp.transpose().dot(D * y) +
+                2.0 * y.transpose().dot(D * this->basis_func_amp);
+    double gz = 2.0 * this->basis_func_amp.transpose().dot(D * z) +
+                2.0 * z.transpose().dot(D * this->basis_func_amp);
 
     this->grad = vec3(gx, gy, gz);
 }
