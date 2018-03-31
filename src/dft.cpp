@@ -501,4 +501,6 @@ void DFT::finalize() {
 
     // // write the grid to a file
     // rg.write_gradient("data.dat");
+
+    std::cout << this->molgrid->get_forces_atoms() << std::endl;
 }

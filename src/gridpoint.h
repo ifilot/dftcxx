@@ -54,8 +54,9 @@ private:
     const vec3 r;               // position in 3D space
     const vec3 r_at;            // get position relative to atom the gridpoint adheres to
 
-    double w;                   // weight
-    double w_becke;             // Fuzzy cell weight
+    double w;                   // total weight (see above)
+    double w_becke;             // Fuzzy cell weight (see: http://dx.doi.org/10.1063/1.454033)
+
     double density;             // current density at grid point
     vec3 grad;                  // gradient
 

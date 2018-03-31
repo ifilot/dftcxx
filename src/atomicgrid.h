@@ -240,9 +240,35 @@ public:
         this->V(idx) = v;
     }
 
+    /**
+     * @brief      get the force on a positive charge at position r
+     *
+     * @param[in]  r       position r of the positive charge
+     * @param[in]  charge  positive charge
+     *
+     * @return     The force.
+     */
+    vec3 get_force(const vec3& r, double charge) const;
+
 private:
+    /**
+     * @brief      calculate first mapping coefficient from z to r
+     *
+     * @param[in]  r     position r
+     * @param[in]  m     scaling value m
+     *
+     * @return     first mapping coefficient
+     */
     double d2zdr2(double r, double m);
 
+    /**
+     * @brief      calculate second mapping coefficient from z to r
+     *
+     * @param[in]  r     position r
+     * @param[in]  m     scaling value m
+     *
+     * @return     second mapping coefficient
+     */
     double dzdrsq(double r, double m);
 
     /**

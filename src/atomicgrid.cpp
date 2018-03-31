@@ -499,12 +499,55 @@ double AtomicGrid::get_sh_value(double r, unsigned int lm) const {
     return this->splines[lm].eval(r);
 }
 
+/**
+ * @brief      get the force on a positive charge at position r
+ *
+ * @param[in]  r       position r of the positive charge
+ * @param[in]  charge  positive charge
+ *
+ * @return     The force.
+ */
+vec3 AtomicGrid::get_force(const vec3& r, double charge) const {
+    double sx = 0.0;
+    double sy = 0.0;
+    double sz = 0.0;
+
+    #pragma omp parallel for reduction(+:sx,sy,sz)
+    for(unsigned int i=0; i<this->grid.size(); i++) {
+        double strength = this->grid[i].get_weight() * this->grid[i].get_density();
+        vec3 direction = r - this->grid[i].get_position();
+        strength /= std::pow(direction.squaredNorm(), 1.5);
+
+        sx += direction[0] * strength;
+        sy += direction[1] * strength;
+        sz += direction[2] * strength;
+    }
+
+    return vec3(sx, sy, sz);
+}
+
+/**
+ * @brief      calculate first mapping coefficient from z to r
+ *
+ * @param[in]  r     position r
+ * @param[in]  m     scaling value m
+ *
+ * @return     first mapping coefficient
+ */
 double AtomicGrid::d2zdr2(double r, double m) {
     double nom = m*m * (m + 3.0 * r);
     double denom = 2.0 * M_PI * std::pow((m * r) / ((m+r)*(m+r)),1.5) * std::pow(m+r,5.0);
     return nom/denom;
 }
 
+/**
+ * @brief      calculate second mapping coefficient from z to r
+ *
+ * @param[in]  r     position r
+ * @param[in]  m     scaling value m
+ *
+ * @return     second mapping coefficient
+ */
 double AtomicGrid::dzdrsq(double r, double m) {
     return m / (M_PI * M_PI * r * (m + r)*(m + r));
 }

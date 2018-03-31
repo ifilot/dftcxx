@@ -166,6 +166,13 @@ public:
      */
     void correct_densities();
 
+    /**
+     * @brief      get the forces on the atom
+     *
+     * @return     atomic forces
+     */
+    MatrixXXd get_forces_atoms() const;
+
 private:
     /**
      * @fn get_becke_weight_pn
