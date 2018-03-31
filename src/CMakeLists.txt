@@ -70,13 +70,15 @@ find_package(Boost COMPONENTS regex iostreams filesystem REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(EIGEN eigen3 REQUIRED)
 pkg_check_modules(TCLAP tclap REQUIRED)
+pkg_check_modules(PNG REQUIRED libpng)
 
 # Set include folders
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_BINARY_DIR}
                     ${TCLAP_INCLUDE_DIR}
                     ${Boost_INCLUDE_DIRS}
-                    ${EIGEN_INCLUDE_DIRS})
+                    ${EIGEN_INCLUDE_DIRS}
+                    ${PNG_INCLUDE_DIRS})
 
 # use C++14 and SSE2 vectorization
 add_definitions(-std=c++14)
@@ -92,7 +94,8 @@ file(GLOB SOURCES "*.cpp")
 add_executable(dftcxx ${SOURCES})
 
 # Link libraries
-target_link_libraries(dftcxx ${Boost_LIBRARIES})
+target_link_libraries(dftcxx )
+target_link_libraries(dftcxx ${PNG_LIBRARIES} ${Boost_LIBRARIES})
 
 ###
 # Installing

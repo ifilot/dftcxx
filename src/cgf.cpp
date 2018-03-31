@@ -57,6 +57,43 @@ const double GTO::get_amp(const vec3& r) const {
 }
 
 /*
+ * @fn get_gradient
+ * @brief Gets the gradient of the GTO
+ *
+ * @param vec3 r    coordinates
+ *
+ * @return gradient
+ */
+vec3 GTO::get_grad(const vec3& r) const {
+    const double ex = std::exp(-this->alpha * std::pow(r[0]-this->position[0],2));
+    const double fx = std::pow(r[0] - this->position[0], this->l) * ex;
+
+    const double ey = std::exp(-this->alpha * std::pow(r[1]-this->position[1],2));
+    const double fy = std::pow(r[1] - this->position[1], this->m) * ey;
+
+    const double ez = std::exp(-this->alpha * std::pow(r[2]-this->position[2],2));
+    const double fz = std::pow(r[2] - this->position[2], this->n) * ez;
+
+    double gx = -2.0 * this->alpha * (r[0]-this->position[0]) * fx;
+    double gy = -2.0 * this->alpha * (r[1]-this->position[1]) * fy;
+    double gz = -2.0 * this->alpha * (r[2]-this->position[2]) * fz;
+
+    if(this->l > 0) {
+        gx += std::pow(r[0] - this->position[0], this->l-1) * ex;
+    }
+    if(this->m > 0) {
+        gy += std::pow(r[1] - this->position[1], this->m-1) * ey;
+    }
+    if(this->n > 0) {
+        gz += std::pow(r[2] - this->position[2], this->n-1) * ez;
+    }
+
+    return vec3(this->c * gx * fy * fz,
+                this->c * fx * gy * fz,
+                this->c * fx * fy * gz);
+}
+
+/*
  * @fn calculate_normalization_constant
  * @brief Calculates the normalization constant so that <GTO|GTO>=1
  *
@@ -111,6 +148,24 @@ const double CGF::get_amp(const vec3& r) const {
 
     for(const auto& gto : this->gtos) {
         sum += gto.get_coefficient() * gto.get_amp(r);
+    }
+
+    return sum;
+}
+
+/*
+ * @fn get_amp
+ * @brief Gets the gradient of the CGF
+ *
+ * @param vec3 r    coordinates
+ *
+ * @return gradient
+ */
+vec3 CGF::get_grad(const vec3& r) const {
+    vec3 sum = vec3(0,0,0);
+
+    for(const auto& gto : this->gtos) {
+        sum += gto.get_coefficient() * gto.get_grad(r);
     }
 
     return sum;
