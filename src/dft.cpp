@@ -28,9 +28,13 @@
  * @param[in]  _settings  settings
  */
 DFT::DFT(const std::shared_ptr<Molecule>& _mol, const std::shared_ptr<Settings>& _settings) :
-settings(_settings) {
+settings(_settings),
+flag_has_energy(false),
+flag_has_forces(false) {
     is_first = true;
     this->add_molecule(_mol);
+    this->integrator = std::make_unique<Integrator>();
+    this->functional = std::make_unique<Functional>();
 }
 
 /**
@@ -80,6 +84,10 @@ void DFT::add_molecule(const std::shared_ptr<Molecule>& _mol) {
  * @return void
  */
 void DFT::scf(bool verbose) {
+    if(this->flag_has_energy) {
+        return;
+    }
+
     static const unsigned int max_iterations = 100;
 
     if(verbose) {
@@ -89,11 +97,13 @@ void DFT::scf(bool verbose) {
         std::cout << "----------------------------------------" << std::endl;
     }
 
+    this->mol->print_geometry();
+
     double old_energy = this->et;
     double difference = 1.0;
     unsigned int iteration = 0;
 
-    while(difference > 1e-4 || iteration < 3) {
+    while(difference > 1e-5 || iteration < 3) {
         iteration++;
 
         auto start = std::chrono::system_clock::now(); //tic
@@ -133,7 +143,7 @@ void DFT::scf(bool verbose) {
             std::cout << std::endl;
         }
 
-        if(iteration >= max_iterations && verbose) {
+        if(iteration >= max_iterations) {
             std::cout << "========================================" << std::endl;
             std::cout << "Stopping because maximum number of iterations has been reached." << std::endl;
             std::cout << std::endl;
@@ -147,31 +157,34 @@ void DFT::scf(bool verbose) {
         std::cout << std::endl;
     }
 
-    this->calculate_hellmann_feynman_forces();
-
-    // output results
-    this->finalize();
+    this->flag_has_energy = true;
 }
 
 /**
- * @brief      perturb atoms of molecule
+ * @brief      get the total energy of the molecule
  *
- * @param[in]  p     perturbation vector
+ * @return     The energy.
  */
-void DFT::perturb_atoms(const VectorXd& p) {
-    for(unsigned int i=0; i<this->mol->get_nr_atoms(); i++) {
-        vec3 newpos = this->mol->get_atom(i)->get_position();
-        for(unsigned int j=0; j<3; j++) {
-            newpos[j] += p[i*3 + j];
-        }
-        this->mol->get_atom(i)->set_position(newpos);
+double DFT::get_energy() {
+    if(!this->flag_has_energy) {
+        this->scf();
     }
+
+    return this->et;
 }
 
 /**
  * @brief      get the force vector
  */
 VectorXd DFT::get_force_vector() {
+    if(!this->flag_has_energy) {
+        this->scf();
+    }
+
+    if(!this->flag_has_forces) {
+        this->calculate_hellmann_feynman_forces();
+    }
+
     auto Ft = F;
     Ft.transposeInPlace();
     return Eigen::Map<VectorXd>(Ft.data(), Ft.cols() * Ft.rows());
@@ -290,7 +303,7 @@ void DFT::calculate_nuclear_repulsion() {
 void DFT::calculate_two_electron_integrals() {
     const unsigned int size = this->mol->get_nr_bfs();
 
-    unsigned int nrints = integrator->teindex(size,size,size,size);
+    unsigned int nrints = this->integrator->teindex(size,size,size,size);
     this->ints = VectorXd::Ones(nrints);
     this->ints *= -1.0;
 
@@ -304,7 +317,7 @@ void DFT::calculate_two_electron_integrals() {
                 for(unsigned int l=0; l<size; l++) {
                     unsigned int kl = k * (k+1)/2 + l;
                     if(ij <= kl) {
-                        unsigned int idx = integrator->teindex(i,j,k,l);
+                        unsigned int idx = this->integrator->teindex(i,j,k,l);
 
                         // this avoids recalculating an integral which has
                         // already been evaluated
@@ -312,10 +325,10 @@ void DFT::calculate_two_electron_integrals() {
                             continue;
                         }
 
-                        this->ints(idx) = integrator->repulsion(this->cgfs->at(i),
-                                                                this->cgfs->at(j),
-                                                                this->cgfs->at(k),
-                                                                this->cgfs->at(l));
+                        this->ints(idx) = this->integrator->repulsion(this->cgfs->at(i),
+                                                                      this->cgfs->at(j),
+                                                                      this->cgfs->at(k),
+                                                                      this->cgfs->at(l));
                     }
                 }
             }
@@ -495,7 +508,7 @@ void DFT::calculate_hartree_potential_te_int() {
             this->J(i,j) = 0.; /* reset J matrix */
             for(unsigned int k=0; k<size; k++) {
                 for(unsigned int l=0; l<size; l++) {
-                    const unsigned int index = integrator->teindex(i,j,k,l);
+                    const unsigned int index = this->integrator->teindex(i,j,k,l);
 
                     // Exchange in Hartree-Fock
                     //const unsigned int index2 = integrator->teindex(i,k,l,j);
@@ -519,8 +532,15 @@ void DFT::calculate_hartree_potential_becke_poisson() {
     this->J = this->molgrid->calculate_hartree_potential();
 }
 
-/*
- * @brief      Finalize calculation and store requested data
+/**
+ * @brief      Calculate the hellmann feynman forces.
  */
-void DFT::finalize() {
+void DFT::calculate_hellmann_feynman_forces() {
+    if(this->flag_has_forces) {
+        return;
+    }
+
+    this->F = this->molgrid->get_forces_atoms();
+
+    this->flag_has_forces = true;
 }

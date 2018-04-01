@@ -26,7 +26,9 @@
 
 class ConjugateGradient {
 private:
-    std::shared_ptr<DFT> dft;
+    std::shared_ptr<Molecule> molecule;
+    std::shared_ptr<Settings> settings;
+    std::unique_ptr<DFT> dft;
 
 public:
     /**
@@ -34,7 +36,7 @@ public:
      *
      * @param[in]  _dft  pointer to dft object
      */
-    ConjugateGradient(const std::shared_ptr<DFT>& _dft);
+    ConjugateGradient(const std::shared_ptr<Molecule> _mol, const std::shared_ptr<Settings> _settings);
 
     /**
      * @brief      optimize DFT structure using conjugate gradient
@@ -46,12 +48,21 @@ public:
      */
     double line_search_backtrack(const VectorXd& g, const VectorXd& h, double rho, double max);
 
+    double line_search_interpolation(const VectorXd& g, const VectorXd& h, double rho, double max);
+
     /**
      * @brief      perform scf and obtain energy
      *
      * @return     The energy.
      */
     double get_energy();
+
+    /**
+     * @brief      perform scf and get gradient
+     *
+     * @return     The gradient
+     */
+    VectorXd get_gradient();
 
     /**
      * @brief      Gets the energy after perturbation, but restore configuation

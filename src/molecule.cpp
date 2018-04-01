@@ -112,9 +112,33 @@ void Molecule::read_molecule_from_file(const std::string& filename) {
     infile.close();
 
     this->set_basis_set(basis_set);
+    this->print_geometry();
+}
+
+/**
+ * @brief      perturb atoms of molecule
+ *
+ * @param[in]  p     perturbation vector
+ */
+void Molecule::perturb_atoms(const VectorXd& p) {
+    for(unsigned int i=0; i<this->get_nr_atoms(); i++) {
+        vec3 newpos = this->get_atom(i)->get_position();
+        for(unsigned int j=0; j<3; j++) {
+            newpos[j] += p[i*3 + j];
+        }
+        this->get_atom(i)->set_position(newpos);
+    }
+
+    this->update_cgfs();
+}
+
+/**
+ * @brief      print the current geometry
+ */
+void Molecule::print_geometry() const {
     std::cout << "========================================" << std::endl;
 
-    for(unsigned int i=0; i<nratoms; i++) {
+    for(unsigned int i=0; i<this->get_nr_atoms(); i++) {
         std::cout << boost::format("%i  %12.6f  %12.6f  %12.6f")
                      % this->atoms[i]->get_charge()
                      % this->atoms[i]->get_position()[0]
@@ -285,4 +309,12 @@ unsigned int Molecule::get_atom_number_from_string(std::string el) {
     }
 
     throw std::runtime_error("Unknown element: " + el);
+}
+
+/**
+ * @brief      update the cgfs after a geometry change
+ */
+void Molecule::update_cgfs() {
+    this->cgfs.clear();
+    this->set_basis_set("basis/" + this->settings->get_value("basis") + ".dat");
 }

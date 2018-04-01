@@ -26,8 +26,9 @@
  *
  * @param[in]  _dft  pointer to dft object
  */
-ConjugateGradient::ConjugateGradient(const std::shared_ptr<DFT>& _dft) :
-dft(_dft) {
+ConjugateGradient::ConjugateGradient(const std::shared_ptr<Molecule> _mol, const std::shared_ptr<Settings> _settings) :
+molecule(_mol),
+settings(_settings) {
 
 }
 
@@ -47,12 +48,11 @@ void ConjugateGradient::optimize() {
 
     VectorXd g = this->dft->get_force_vector();
     VectorXd h = -g;
-    h.normalize();
+    // h.normalize();
 
     while((std::abs(eold - enew) > tol || iter < 2) && iter < 30) {
         std::cout << "*** Performing line search" << std::endl;
         const double alpha = this->line_search_backtrack(g, h, .5, 0.5);
-        dft->perturb_atoms(alpha * h);
 
         // get new energy and gradient
         eold = enew;
@@ -61,15 +61,15 @@ void ConjugateGradient::optimize() {
 
         if(enew > eold) {
             std::cout << "*** Performing conjugate gradient step" << std::endl;
-            this->dft->perturb_atoms(-alpha * h);
-            this->dft->scf();
+            this->molecule->perturb_atoms(-alpha * h);
+            this->dft.release();
             eold = 1000;
             h = -g;
             continue;
         }
 
         const VectorXd oldg = g;
-        g = this->dft->get_force_vector();
+        g = this->get_gradient();
 
         // calculate new search direction
         double beta = g.dot(g - oldg) / oldg.dot(oldg);
@@ -83,7 +83,7 @@ void ConjugateGradient::optimize() {
         }
 
         h = -g + beta * h;
-        h.normalize();
+        // h.normalize();
 
         iter++;
     }
@@ -108,11 +108,62 @@ double ConjugateGradient::line_search_backtrack(const VectorXd& g, const VectorX
         double eold = enew;
         enew = this->get_energy_perturbation(alpha * h);
         iter++;
-
-
     }
 
     return alpha;
+}
+
+/**
+ * @brief      line search backtrack
+ */
+double ConjugateGradient::line_search_interpolation(const VectorXd& g, const VectorXd& h, double rho, double max) {
+    static const double t = 1e-4;
+
+    // calculate energy and gradient at 0
+    double e0 = this->get_energy();
+    auto f0 = this->get_gradient();
+
+    // calculate energy at a0
+    double a0 = max;
+    double e1 = this->get_energy_perturbation(a0 * h);
+    double deriv = f0.dot(h);
+
+    std::cout << a0 << std::endl;
+
+    // check whether this step was sufficient
+    double e_ideal = e0 + t * a0 * deriv;
+    std::cout << "Expecting to get at least: " << e_ideal << ", got: " << e1 << std::endl;
+    if(e1 <= e_ideal) {
+        return a0;
+    }
+
+    // establish predictor step
+    double a1 = -f0.dot(h) * a0 * a0 / (2.0 * (e1 - e0 - deriv * a0));
+
+    std::cout << a1 << std::endl;
+
+    double e2 = this->get_energy_perturbation((a1 - a0) * h);
+
+    // check whether this step was sufficient
+    e_ideal = e0 + t * a1 * deriv;
+    std::cout << "Expecting to get at least: " << e_ideal << ", got: " << e2 << std::endl;
+    if(e2 <= e_ideal) {
+        return a1;
+    }
+
+    double a = 1.0 / (a0 * a0 * a1 * a1 * (a1 - a0)) * (a0 * a0 * (e2 - e0 - deriv * a1) - a1 * a1 * (e1 - e0 - deriv * a0));
+    double b = 1.0 / (a0 * a0 * a1 * a1 * (a1 - a0)) * (-a0 * a0 * a0 * (e2 - e0 - deriv * a1) + a1 * a1 * a1 * (e1 - e0 - deriv * a0));
+    double a2 = -b + std::sqrt(b * b - 3.0 * a * deriv) / (3.0 * a);
+
+    if(a2 < 0) {
+        a2 = a1 / 2.0;
+    }
+
+    std::cout << a2 << std::endl;
+
+    double e3 = this->get_energy_perturbation((a2 - a1) * h);
+
+    return a2;
 }
 
 /**
@@ -121,22 +172,29 @@ double ConjugateGradient::line_search_backtrack(const VectorXd& g, const VectorX
  * @return     The energy.
  */
 double ConjugateGradient::get_energy() {
-    std::cout << "---------------------------------------------------" << std::endl;
-    this->dft->scf();
-    std::cout << "---------------------------------------------------" << std::endl;
+    if(!this->dft) {
+        this->dft = std::make_unique<DFT>(this->molecule, this->settings);
+    }
     return this->dft->get_energy();
+}
+
+/**
+ * @brief      perform scf and get gradient
+ *
+ * @return     The gradient
+ */
+VectorXd ConjugateGradient::get_gradient() {
+    if(!this->dft) {
+        this->dft = std::make_unique<DFT>(this->molecule, this->settings);
+    }
+    return this->dft->get_force_vector();
 }
 
 /**
  * @brief      Gets the energy after perturbation, but restore configuration
  */
 double ConjugateGradient::get_energy_perturbation(const VectorXd& h) {
-    this->dft->perturb_atoms(h);
-    std::cout << "---------------------------------------------------" << std::endl;
-    this->dft->scf();
-    std::cout << "---------------------------------------------------" << std::endl;
-    double e = this->dft->get_energy();
-    this->dft->perturb_atoms(-h);
-
-    return e;
+    this->dft.release();
+    this->molecule->perturb_atoms(h);
+    return this->get_energy();
 }

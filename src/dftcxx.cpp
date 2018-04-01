@@ -55,11 +55,8 @@ int main(int argc, char** argv) {
         auto settings = std::make_shared<Settings>(input_filename);
         auto mol = std::make_shared<Molecule>(input_filename, settings);
 
-        // construct dft object
-        auto dft = std::make_shared<DFT>(mol, settings);
-
         // construct conjugate gradient optimizer
-        auto cgo = std::make_shared<ConjugateGradient>(dft);
+        auto cgo = std::make_shared<ConjugateGradient>(mol, settings);
         cgo->optimize();
 
         auto end = std::chrono::system_clock::now();

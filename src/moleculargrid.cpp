@@ -159,9 +159,9 @@ MatrixXXd MolecularGrid::get_forces_atoms() const {
 
             // calculate attraction of electron densities
             const vec3 f = this->atomic_grids[j]->get_force(this->mol->get_atom(i)->get_position(), this->mol->get_atom(i)->get_charge());
-            ans(i,0) -= f[0];
-            ans(i,1) -= f[1];
-            ans(i,2) -= f[2];
+            ans(i,0) += f[0];
+            ans(i,1) += f[1];
+            ans(i,2) += f[2];
 
             // add repulsion of other atoms
             if(i != j) {
@@ -169,9 +169,9 @@ MatrixXXd MolecularGrid::get_forces_atoms() const {
                 vec3 direction = this->mol->get_atom(i)->get_position() - this->mol->get_atom(j)->get_position();
                 strength /= std::pow(direction.squaredNorm(), 1.5);
 
-                ans(i,0) += strength * direction[0];
-                ans(i,1) += strength * direction[1];
-                ans(i,2) += strength * direction[2];
+                ans(i,0) -= strength * direction[0];
+                ans(i,1) -= strength * direction[1];
+                ans(i,2) -= strength * direction[2];
             }
         }
     }

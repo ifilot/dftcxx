@@ -42,8 +42,8 @@ class DFT {
 private:
     std::shared_ptr<Molecule> mol;              // pointer to molecule class
     std::unique_ptr<MolecularGrid> molgrid;     // pointer to molecular grid
-    std::shared_ptr<Integrator> integrator;     // pointer to integrator class
-    std::shared_ptr<Functional> functional;     // pointer to functional class
+    std::unique_ptr<Integrator> integrator;     // pointer to integrator class
+    std::unique_ptr<Functional> functional;     // pointer to functional class
     std::shared_ptr<Settings> settings;         // pointer to settings class
 
     const std::vector<CGF>* cgfs;               // pointer vector of Contracted Gaussian Functions
@@ -72,6 +72,8 @@ private:
     double electronic_repulsion;    // total electronic repulsion 2*trace(P * J)
 
     bool is_first;                  // whether this is the first iteration
+    bool flag_has_energy;           // whether energy has been calculated
+    bool flag_has_forces;           // whether forces have been calculated
 
 public:
 
@@ -101,16 +103,7 @@ public:
      *
      * @return     The energy.
      */
-    inline double get_energy() {
-        return this->et;
-    }
-
-    /**
-     * @brief      perturb atoms of molecule
-     *
-     * @param[in]  p     perturbation vector
-     */
-    void perturb_atoms(const VectorXd& p);
+    double get_energy();
 
 private:
     /*
@@ -234,14 +227,7 @@ private:
     /**
      * @brief      Calculate the hellmann feynman forces.
      */
-    inline void calculate_hellmann_feynman_forces() {
-        this->F = this->molgrid->get_forces_atoms();
-    }
-
-    /*
-     * @brief      Finalize calculation and store requested data
-     */
-    void finalize();
+    void calculate_hellmann_feynman_forces();
 };
 
 #endif //_DFT_H

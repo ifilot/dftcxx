@@ -34,6 +34,7 @@
 #include "settings.h"
 
 typedef Eigen::Vector3d vec3;
+typedef Eigen::Matrix<double, Eigen::Dynamic, 1> VectorXd;
 
 /**
  * @brief      Class for atom.
@@ -111,6 +112,18 @@ public:
      * @param[in]  filename  The filename
      */
     void read_molecule_from_file(const std::string& filename);
+
+    /**
+     * @brief      perturb atoms of molecule
+     *
+     * @param[in]  p     perturbation vector
+     */
+    void perturb_atoms(const VectorXd& p);
+
+    /**
+     * @brief      print the current geometry
+     */
+    void print_geometry() const;
 
     /**
      * @brief      Gets the number of atoms.
@@ -233,6 +246,11 @@ private:
      * @return     atom number
      */
     unsigned int get_atom_number_from_string(std::string el);
+
+    /**
+     * @brief      update the cgfs after a geometry change
+     */
+    void update_cgfs();
 };
 
 #endif //_MOLECULE_H

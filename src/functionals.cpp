@@ -21,6 +21,10 @@
 
 #include "functionals.h"
 
+Functional::Functional() {
+
+}
+
 void Functional::xalpha_x_functional(const VectorXd& densitiesa,
                                      const VectorXd& densitiesb,
                                      VectorXd& ex,
