@@ -55,8 +55,7 @@ double SH::legendre (int n, double x) {
         return -1;
     }
 
-    double v[n];
-        v[0] = 1.0;
+    std::vector<double> v(n+1, 0.0);
 
     if(n < 1) {
         return 1.0;
@@ -84,11 +83,7 @@ double SH::legendre_p (int n, int m, double x) {
     int i;
     int j;
     int k;
-    double v[n+1];
-
-    for ( i = 0; i < n + 1; i++ ) {
-        v[i] = 0.0;
-    }
+    std::vector<double> v(n+1, 0.0);
 
     //
     //  J = M is the first nonzero function.
