@@ -105,6 +105,22 @@ public:
      */
     double get_energy();
 
+    /**
+     * @brief      Pre-initialize a wave function
+     *
+     * @param[in]  _P    density matrix P
+     */
+    void set_wavefunction(const MatrixXXd& _P);
+
+    /**
+     * @brief      Get the density matrix.
+     *
+     * @return     The density matrix.
+     */
+    inline const auto& get_density_matrix() const {
+        return this->P;
+    }
+
 private:
     /*
      * construction functions

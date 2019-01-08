@@ -26,7 +26,8 @@
  *
  * @param[in]  _dft  pointer to dft object
  */
-ConjugateGradient::ConjugateGradient(const std::shared_ptr<Molecule> _mol, const std::shared_ptr<Settings> _settings) :
+ConjugateGradient::ConjugateGradient(const std::shared_ptr<Molecule> _mol,
+                                     const std::shared_ptr<Settings> _settings) :
 molecule(_mol),
 settings(_settings) {
 
@@ -36,33 +37,43 @@ settings(_settings) {
  * @brief      optimize DFT structure using conjugate gradient
  */
 void ConjugateGradient::optimize() {
-    static const double tol = 1e-3;
+    static const double tol = 1e-4;
     static const unsigned int reset_cg = 10;
+    const unsigned int itermax = 50;
 
-    unsigned int iter = 1;              // keep track of iterations
+    this->iter = 1;                     // keep track of iterations
     unsigned int reset_counter = 0;     // nr of cycles since last cg reset
 
-    std::cout << "*** Calculate initial energy" << std::endl;
+    this->output_iteration(iter);
+
+    std::cout << "[CG-OPT] Calculate initial energy" << std::endl << std::endl;
     double enew = this->get_energy();
+    this->energies.push_back(enew);
     double eold = 1000; // some large number
 
     VectorXd g = this->dft->get_force_vector();
     VectorXd h = -g;
     // h.normalize();
 
-    while((std::abs(eold - enew) > tol || iter < 2) && iter < 30) {
-        std::cout << "*** Performing line search" << std::endl;
-        const double alpha = this->line_search_backtrack(g, h, .5, 0.5);
+    // keep looping until energy criterion (tol) is met or maximum
+    // number of iterations is reached
+    while(std::abs(eold - enew) > tol && iter < itermax) {
+        this->iter++;
+        this->output_iteration(iter);
+
+        std::cout << "[CG-OPT] Performing line search" << std::endl << std::endl;
+        const double alpha = this->line_search_backtrack(g, h, 0.5, 0.5);
 
         // get new energy and gradient
         eold = enew;
-        std::cout << "*** Using new line search value" << std::endl;
+        std::cout << "[CG-OPT] Using new line search value" << std::endl << std::endl;
         enew = this->get_energy();
+        this->energies.push_back(enew);
 
         if(enew > eold) {
-            std::cout << "*** Performing conjugate gradient step" << std::endl;
+            std::cout << "[CG-OPT] Performing conjugate gradient step" << std::endl << std::endl;
             this->molecule->perturb_atoms(-alpha * h);
-            this->dft.release();
+            this->dft.release();    // destroy DFT object
             eold = 1000;
             h = -g;
             continue;
@@ -84,9 +95,26 @@ void ConjugateGradient::optimize() {
 
         h = -g + beta * h;
         // h.normalize();
-
-        iter++;
     }
+
+    if(iter < itermax) {
+        std::cout << "------------------------------------------------------" << std::endl;
+        std::cout << " Stopping CG-opt: Energy criterion is reached" << std::endl;
+        std::cout << "------------------------------------------------------" << std::endl;
+    } else {
+        std::cout << "------------------------------------------------------" << std::endl;
+        std::cout << " Stopping CG-opt: Maximum number of iterations" << std::endl;
+        std::cout << "------------------------------------------------------" << std::endl;
+    }
+
+    // print energy convergence
+    for(unsigned int i=0; i<this->energies.size(); i++) {
+        std::cout << boost::format("%3i  %12.6f") % (i+1) % this->energies[i] << std::endl;
+    }
+    std::cout << "------------------------------------------------------" << std::endl;
+
+    // print final geometry
+    //this->molecule->print_geometry();
 }
 
 /**
@@ -95,7 +123,8 @@ void ConjugateGradient::optimize() {
 double ConjugateGradient::line_search_backtrack(const VectorXd& g, const VectorXd& h, double rho, double max) {
     static const double t = 1e-4;
     static const double c_ideal = .5;
-    unsigned int iter = 0;
+    unsigned int maxsteps = 4;
+    unsigned int steps = 0;
 
     double alpha = max;
     double estart = this->get_energy();
@@ -103,11 +132,13 @@ double ConjugateGradient::line_search_backtrack(const VectorXd& g, const VectorX
 
     const double e_ideal = estart + c_ideal * t * g.dot(h);
 
-    while(enew > e_ideal && iter < 20) {
+    while(enew > e_ideal && steps < maxsteps) {
         alpha *= rho;
         double eold = enew;
+        this->iter++;
+        this->output_iteration(this->iter);
         enew = this->get_energy_perturbation(alpha * h);
-        iter++;
+        steps++;
     }
 
     return alpha;
@@ -172,10 +203,20 @@ double ConjugateGradient::line_search_interpolation(const VectorXd& g, const Vec
  * @return     The energy.
  */
 double ConjugateGradient::get_energy() {
+    // check if DFT object is destroyed
     if(!this->dft) {
         this->dft = std::make_unique<DFT>(this->molecule, this->settings);
+
+        // if the density matrix is not empty, re-use the old wave function
+        if(this->P.cols() > 0) {
+            this->dft->set_wavefunction(this->P);
+        }
     }
-    return this->dft->get_energy();
+
+    double energy = this->dft->get_energy();
+    this->P = this->dft->get_density_matrix();
+
+    return energy;
 }
 
 /**
@@ -186,8 +227,17 @@ double ConjugateGradient::get_energy() {
 VectorXd ConjugateGradient::get_gradient() {
     if(!this->dft) {
         this->dft = std::make_unique<DFT>(this->molecule, this->settings);
+
+        // if the density matrix is not empty, re-use the old wave function
+        if(this->P.cols() > 0) {
+            this->dft->set_wavefunction(this->P);
+        }
     }
-    return this->dft->get_force_vector();
+
+    auto forces = this->dft->get_force_vector();
+    this->P = this->dft->get_density_matrix();
+
+    return forces;
 }
 
 /**
@@ -196,5 +246,12 @@ VectorXd ConjugateGradient::get_gradient() {
 double ConjugateGradient::get_energy_perturbation(const VectorXd& h) {
     this->dft.release();
     this->molecule->perturb_atoms(h);
+
     return this->get_energy();
+}
+
+void ConjugateGradient::output_iteration(unsigned int iter) {
+    std::cout << boost::format("------------------------------------------------------") << std::endl << std::endl;
+    std::cout << boost::format("                         %02i                         ") % iter << std::endl << std::endl;
+    std::cout << boost::format("------------------------------------------------------") << std::endl << std::endl;
 }

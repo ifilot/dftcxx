@@ -90,18 +90,16 @@ void DFT::scf(bool verbose) {
 
     static const unsigned int max_iterations = 100;
 
-    if(verbose) {
-        std::cout << "          Starting calculation          " << std::endl;
-        std::cout << "========================================" << std::endl;
-        std::cout << "  #        energy    elec" << std::endl;
-        std::cout << "----------------------------------------" << std::endl;
-    }
-
+    // print coordinates
     this->mol->print_geometry();
 
     double old_energy = this->et;
     double difference = 1.0;
     unsigned int iteration = 0;
+
+    // print header
+    std::cout << " Performing electronic structure calculation " << std::endl;
+    std::cout << "=============================================" << std::endl;
 
     while(difference > 1e-5 || iteration < 3) {
         iteration++;
@@ -119,6 +117,7 @@ void DFT::scf(bool verbose) {
         difference = std::abs(this->et - old_energy);
         old_energy = this->et;
 
+        // detailed output if verbose is enabled
         if(verbose) {
             std::cout << boost::format("%3i    %9.7f    %4.2f (%3i) \n")
                                 % iteration
@@ -134,7 +133,7 @@ void DFT::scf(bool verbose) {
                                 % (elapsed.count());
 
             std::cout << "----------------------------------------" << std::endl;
-        } else {
+        } else {    // regular output
             std::cout << boost::format("%4i | %12.8f | %12.8f | %4.1f ms")
                                 % iteration
                                 % this->et
@@ -144,15 +143,15 @@ void DFT::scf(bool verbose) {
         }
 
         if(iteration >= max_iterations) {
-            std::cout << "========================================" << std::endl;
+            std::cout << "=============================================" << std::endl;
             std::cout << "Stopping because maximum number of iterations has been reached." << std::endl;
             std::cout << std::endl;
             break;
         }
     }
 
-    if(iteration < max_iterations && verbose) {
-        std::cout << "========================================" << std::endl;
+    if(iteration < max_iterations) {
+        std::cout << "=============================================" << std::endl;
         std::cout << "Stopping because energy criterion is reached." << std::endl;
         std::cout << std::endl;
     }
@@ -171,6 +170,22 @@ double DFT::get_energy() {
     }
 
     return this->et;
+}
+
+/**
+ * @brief      Pre-initialize a wave function
+ *
+ * @param[in]  _P    density matrix P
+ */
+void DFT::set_wavefunction(const MatrixXXd& _P) {
+    // set the new density
+    this->P = _P;
+
+    // calculate properties based on the density
+    this->molgrid->set_density(this->P);
+    this->molgrid->correct_densities();
+    this->calculate_electronic_repulsion_matrix();
+    this->calculate_exchange_correlation_matrix();
 }
 
 /**
@@ -509,15 +524,6 @@ void DFT::calculate_hartree_potential_te_int() {
             for(unsigned int k=0; k<size; k++) {
                 for(unsigned int l=0; l<size; l++) {
                     const unsigned int index = this->integrator->teindex(i,j,k,l);
-
-                    // Exchange in Hartree-Fock
-                    //const unsigned int index2 = integrator->teindex(i,k,l,j);
-                    //this->J(i,j) += P(k,l) * (ints(index) - 0.5 * ints(index2));
-
-                    // I still don't understand why I need to put a 0.5 here... (see also the function below)
-                    // Does it have anything to do how I construct the density matrix P?
-                    // Can someone who knows the answer send me an e-mail?
-
                     this->J(i,j) += P(k,l) * ints(index);
                 }
             }

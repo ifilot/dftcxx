@@ -59,8 +59,8 @@ settings(_settings)
  * @param[in]  filename  The filename
  */
 void Molecule::read_molecule_from_file(const std::string& filename) {
-    std::cout << "           Reading input file           " << std::endl;
-    std::cout << "========================================" << std::endl;
+    std::cout << "             Reading input file              " << std::endl;
+    std::cout << "=============================================" << std::endl;
 
     static const double angstrom_to_bohr = 1.889725989;
     bool unit_angstrom;
@@ -136,7 +136,7 @@ void Molecule::perturb_atoms(const VectorXd& p) {
  * @brief      print the current geometry
  */
 void Molecule::print_geometry() const {
-    std::cout << "========================================" << std::endl;
+    std::cout << "=============================================" << std::endl;
 
     for(unsigned int i=0; i<this->get_nr_atoms(); i++) {
         std::cout << boost::format("%i  %12.6f  %12.6f  %12.6f")
@@ -146,7 +146,7 @@ void Molecule::print_geometry() const {
                      % this->atoms[i]->get_position()[2] << std::endl;
     }
 
-    std::cout << "========================================" << std::endl;
+    std::cout << "=============================================" << std::endl;
     std::cout << "Total number of GTOs: " << this->get_nr_gtos() << std::endl;
     std::cout << std::endl;
 }

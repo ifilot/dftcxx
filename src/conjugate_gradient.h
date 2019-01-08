@@ -29,14 +29,19 @@ private:
     std::shared_ptr<Molecule> molecule;
     std::shared_ptr<Settings> settings;
     std::unique_ptr<DFT> dft;
+    MatrixXXd P;                        // copy of the density matrix
+    std::vector<double> energies;       // store energies
+    unsigned int iter;
 
 public:
     /**
      * @brief      Constructs the object.
      *
      * @param[in]  _dft  pointer to dft object
+     * @param[in]  _dft  pointer to settings object
      */
-    ConjugateGradient(const std::shared_ptr<Molecule> _mol, const std::shared_ptr<Settings> _settings);
+    ConjugateGradient(const std::shared_ptr<Molecule> _mol,
+                      const std::shared_ptr<Settings> _settings);
 
     /**
      * @brief      optimize DFT structure using conjugate gradient
@@ -70,6 +75,7 @@ public:
     double get_energy_perturbation(const VectorXd& h);
 
 private:
+    void output_iteration(unsigned int iter);
 
 };
 
