@@ -39,3 +39,4 @@ bin/dftcxx
 
 build/*
 pyquante.log
+src/config.h

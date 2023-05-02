@@ -19,3 +19,5 @@ jobs:
       run: mkdir build && cd build && cmake ../src
     - name: Build
       run: cd build && make -j3
+    - name: Testing
+      run: cd build && make test

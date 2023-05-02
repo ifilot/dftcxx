@@ -19,14 +19,12 @@ DFTCXX depends on a couple of libraries, which are normally directly available b
 * [Boost](https://www.boost.org/)
 * [TCLAP](https://tclap.sourceforge.net/)
 * [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page)
-* [libPNG](http://www.libpng.org/pub/png/libpng.html)
 
 To ensure you have the right packages on a (Debian-type) of operating system,
 you can run the following
 
 ```
-sudo apt install build-essential cmake libboost-all-dev pkg-config libeigen3-dev \
-libpng-dev libtclap-dev
+sudo apt install build-essential cmake libboost-all-dev pkg-config libeigen3-dev libtclap-dev
 ```
 
 To compile the program:
@@ -35,6 +33,12 @@ mkdir build
 cd build
 cmake ../src
 make -j9
+```
+
+Finally, to test the program, run
+
+```
+make test
 ```
 
 ## Execution

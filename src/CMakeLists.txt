@@ -28,9 +28,9 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules )
 
 # prepare configuration file
 SET(VERSION_MAJOR "1")
-SET(VERSION_MINOR "1")
-SET(VERSION_MICRO "2")
-configure_file(config.h.in ../src/config.h @ONLY)
+SET(VERSION_MINOR "2")
+SET(VERSION_MICRO "0")
+configure_file(${CMAKE_SOURCE_DIR}/config.h.in ${CMAKE_SOURCE_DIR}/config.h @ONLY)
 
 # Enable release build
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -68,9 +68,9 @@ SET (BOOST_ALL_DYN_LINK OFF)
 
 find_package(Boost COMPONENTS regex iostreams filesystem REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(CPPUNIT REQUIRED) # for unit tests
 pkg_check_modules(EIGEN eigen3 REQUIRED)
 pkg_check_modules(TCLAP tclap REQUIRED)
-pkg_check_modules(PNG REQUIRED libpng)
 
 # Set include folders
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
@@ -78,24 +78,33 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${TCLAP_INCLUDE_DIR}
                     ${Boost_INCLUDE_DIRS}
                     ${EIGEN_INCLUDE_DIRS}
-                    ${PNG_INCLUDE_DIRS})
+                    ${CPPUNIT_INCLUDE_DIR})
 
-# use C++14 and SSE2 vectorization
-add_definitions(-std=c++14)
+# use C++17 and use native compilation
+add_definitions(-std=c++17)
 add_definitions(-march=native)
 if(OPENMP_FOUND)
-    add_definitions(-DHAS_OPENMP)
+    option(HAS_OPENMP "OpenMP enabled" ON)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
 # Add sources
 file(GLOB SOURCES "*.cpp")
-
-# Set executable
-add_executable(dftcxx ${SOURCES})
+list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/dftcxx.cpp)
+add_library(dftcxxsources STATIC ${SOURCES})
+add_executable(dftcxx ${CMAKE_CURRENT_SOURCE_DIR}/dftcxx.cpp)
 
 # Link libraries
-target_link_libraries(dftcxx )
-target_link_libraries(dftcxx ${PNG_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(dftcxx dftcxxsources ${Boost_LIBRARIES})
+
+if(NOT DISABLE_TEST)
+    message("[USER] Performing unit tests")
+    enable_testing ()
+    add_subdirectory("test")
+else()
+    message("[USER] Testing routine disabled")
+endif()
 
 ###
 # Installing
