@@ -460,15 +460,6 @@ void DFT::calculate_hartree_potential_te_int() {
             for(unsigned int k=0; k<size; k++) {
                 for(unsigned int l=0; l<size; l++) {
                     const unsigned int index = integrator->teindex(i,j,k,l);
-
-                    // Exchange in Hartree-Fock
-                    //const unsigned int index2 = integrator->teindex(i,k,l,j);
-                    //this->J(i,j) += P(k,l) * (ints(index) - 0.5 * ints(index2));
-
-                    // I still don't understand why I need to put a 0.5 here... (see also the function below)
-                    // Does it have anything to do how I construct the density matrix P?
-                    // Can someone who knows the answer send me an e-mail?
-
                     this->J(i,j) += P(k,l) * ints(index);
                 }
             }
@@ -486,19 +477,4 @@ void DFT::calculate_hartree_potential_becke_poisson() {
 /*
  * @brief      Finalize calculation and store requested data
  */
-void DFT::finalize() {
-
-    // needs to be connected to interface
-
-    // // build rectangular grid
-    // RectangularGrid rg(this->mol);
-
-    // // create grid points
-    // rg.build_grid(5.0, 15);
-
-    // // set the density
-    // rg.set_density(this->P);
-
-    // // write the grid to a file
-    // rg.write_gradient("data.dat");
-}
+void DFT::finalize() {}

@@ -90,6 +90,15 @@ public:
      */
     void scf();
 
+    /**
+     * @brief      Gets the total energy.
+     *
+     * @return     The total electronic energy.
+     */
+    inline double get_total_energy() const {
+        return this->et;
+    }
+
 private:
     /*
      * construction functions

@@ -1,0 +1,9 @@
+name = hydrogen molecule
+basis = sto3g
+units = angstrom
+grid = ultrafine
+
+system:
+2
+H   0   0   -0.3679020
+H   0   0    0.3679020

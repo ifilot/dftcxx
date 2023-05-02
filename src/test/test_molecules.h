@@ -23,14 +23,19 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
+#include "dft.h"
+
 class TestMolecules : public CppUnit::TestFixture
 {
   CPPUNIT_TEST_SUITE( TestMolecules );
+  CPPUNIT_TEST( testH2 );
   CPPUNIT_TEST_SUITE_END();
 
 public:
   void setUp();
   void tearDown();
+
+  void testH2();
 
 private:
 };

@@ -47,3 +47,9 @@ foreach(testexec ${EXECUTABLES})
     add_test(NAME ${testexec} COMMAND ${testexec})
     set_tests_properties(${testexec} PROPERTIES FIXTURES_REQUIRED Dataset)
 endforeach()
+
+#######################################################
+# add testinput files
+#######################################################
+configure_file(../../basis/sto3g.dat ../basis/sto3g.dat COPYONLY)
+configure_file(molecules/h2.in h2.in COPYONLY)

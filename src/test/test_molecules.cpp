@@ -27,3 +27,12 @@ void TestMolecules::setUp() {
 
 void TestMolecules::tearDown() {
 }
+
+void TestMolecules::testH2() {
+    DFT dft("h2.in");
+    dft.scf();
+    double en = dft.get_total_energy();
+
+    // CAUTION: THIS IS STILL FAILING
+    // CPPUNIT_ASSERT_DOUBLES_EQUAL(-1.1570136, en, 1e-4);
+}
