@@ -8,9 +8,10 @@ mainly written for educational purposes. The source code has been documented
 (i.e. commented) relatively extensively to provide students the opportunity to
 read and understand the algorithm.
 
-> **Note**: Want to know more about electronic structure calculations? Have a look at my
->  [free lecture book](https://ifilot.pages.tue.nl/elements-of-electronic-structure-theory/).
-
+> [!TIP]  
+>  * Want to know more about electronic structure calculations? Have a look at my
+>    [free lecture book](https://ifilot.pages.tue.nl/elements-of-electronic-structure-theory/).
+>  * Interested in a Python-based Density Functional Theory code? Have a look at [PyDFT](https://github.com/ifilot/pydft)
 
 ## Compilation
 
